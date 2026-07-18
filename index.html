@@ -257,9 +257,11 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
 .empty-state .ic{font-size:30px; margin-bottom:10px; opacity:.5;}
 
 @media(max-width:860px){
-  #sidebar{position:fixed; z-index:90; height:100vh; left:0; top:0;}
+  #sidebar{position:fixed; z-index:90; height:100vh; left:0; top:0; box-shadow:var(--shadow-md);}
   #sidebar:not(.collapsed){width:230px;}
-  #sidebar.collapsed{width:0; overflow:hidden; border:none;}
+  #sidebar.collapsed{width:0; overflow:hidden; border:none; box-shadow:none;}
+  /* o topbar precisa ficar ACIMA da sidebar fixa, senão o botão ☰ fica escondido atrás dela */
+  #topbar{position:relative; z-index:95;}
   .kpi-card{padding:9px 11px;}
   .kpi-card .val{font-size:17px;}
   .kpi-card .lbl{font-size:10px;}
@@ -1133,8 +1135,15 @@ function attachMotoristaListeners(){
 }
 
 /* ============ NAVIGATION ============ */
+const isMobileViewport = () => window.matchMedia('(max-width:860px)').matches;
+// Em celular a sidebar vira um menu por cima do conteúdo — começa fechada,
+// e fecha de novo sozinha depois de escolher uma opção.
+if(isMobileViewport()) document.getElementById('sidebar').classList.add('collapsed');
 document.querySelectorAll('.sb-item[data-view]').forEach(btn=>{
-  btn.addEventListener('click', ()=>switchView(btn.dataset.view));
+  btn.addEventListener('click', ()=>{
+    switchView(btn.dataset.view);
+    if(isMobileViewport()) document.getElementById('sidebar').classList.add('collapsed');
+  });
 });
 function switchView(view, filter){
   document.querySelectorAll('.sb-item[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
