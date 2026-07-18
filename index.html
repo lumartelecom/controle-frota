@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumar Telecom | Controle de Frota</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============ DESIGN TOKENS ============ */
+:root[data-theme="light"]{
+  --bg:#F5F6F8; --surface:#FFFFFF; --surface-alt:#FAFBFC; --border:#E1E4E9;
+  --ink:#14161C; --ink-muted:#5B6270; --ink-faint:#9AA1AC;
+  --brand:#E30613; --brand-dark:#B8040F; --brand-ink:#FFFFFF;
+  --st-critica:#E30613; --st-alta:#F2994A; --st-media:#2F80ED; --st-baixa:#6FCF97;
+  --st-novo:#5B6270; --st-analise:#2F80ED; --st-manutencao:#9B51E0; --st-concluido:#27AE60;
+  --shadow-sm:0 1px 2px rgba(20,22,28,.06); --shadow-md:0 8px 24px rgba(20,22,28,.10);
+  --radius:10px;
+}
+:root[data-theme="dark"]{
+  --bg:#0A1120; --surface:#111B2E; --surface-alt:#0D1626; --border:#1E2B45;
+  --ink:#E8EDF5; --ink-muted:#8B96AC; --ink-faint:#5C6780;
+  --brand:#22D3EE; --brand-dark:#0FB8D4; --brand-ink:#04141F;
+  --st-critica:#F2543D; --st-alta:#F97316; --st-media:#38BDF8; --st-baixa:#34D399;
+  --st-novo:#8B96AC; --st-analise:#38BDF8; --st-manutencao:#A78BFA; --st-concluido:#34D399;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4); --shadow-md:0 8px 28px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.hidden{display:none !important;}
+button{font-family:inherit; cursor:pointer;}
+input,select,textarea{font-family:inherit; font-size:14px;}
+a{color:inherit;}
+
+/* ============ LOGIN ============ */
+#loginScreen{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(160deg,#060B14 0%,#0B1526 55%,#04222C 100%);
+  padding:20px;
+}
+.login-card{
+  width:100%; max-width:380px; background:var(--surface); border-radius:16px;
+  padding:36px 32px; box-shadow:var(--shadow-md);
+}
+.login-logo{display:flex; align-items:center; gap:10px; margin-bottom:28px;}
+.login-logo .mark{
+  width:38px; height:38px; border-radius:9px; background:var(--brand);
+  display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:15px;
+}
+.login-logo .name{font-weight:700; font-size:17px; letter-spacing:-.2px;}
+.login-logo .sub{font-size:11px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.06em;}
+.field{margin-bottom:16px;}
+.field label{display:block; font-size:12px; font-weight:600; color:var(--ink-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;}
+.field input, .field select{
+  width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:8px;
+  background:var(--surface-alt); color:var(--ink); outline:none; transition:border-color .15s;
+}
+.field input:focus, .field select:focus{border-color:var(--brand);}
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:11px 18px; border-radius:8px; border:none; font-weight:600; font-size:14px;
+  transition:transform .08s, opacity .15s;
+}
+.btn:active{transform:scale(.98);}
+.btn-primary{background:var(--brand); color:var(--brand-ink); width:100%;}
+.btn-primary:hover{background:var(--brand-dark);}
+.btn-ghost{background:transparent; color:var(--ink-muted); border:1.5px solid var(--border);}
+.btn-ghost:hover{border-color:var(--ink-faint);}
+.btn-danger{background:transparent; color:var(--st-critica); border:1.5px solid var(--st-critica);}
+.btn-danger:hover{background:var(--st-critica); color:#fff;}
+.login-row{display:flex; justify-content:space-between; align-items:center; margin:14px 0 22px; font-size:13px;}
+.login-row label{display:flex; align-items:center; gap:6px; color:var(--ink-muted);}
+.link-btn{background:none; border:none; color:var(--brand); font-size:13px; font-weight:600;}
+#loginError{color:var(--st-critica); font-size:13px; margin-top:10px; display:none;}
+
+/* ============ APP SHELL ============ */
+#appShell{display:flex; min-height:100vh;}
+#sidebar{
+  width:230px; background:var(--surface); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; transition:width .18s ease; flex-shrink:0;
+}
+#sidebar.collapsed{width:68px;}
+.sb-head{display:flex; align-items:center; gap:10px; padding:18px 16px; border-bottom:1px solid var(--border);}
+.sb-head .mark{width:32px; height:32px; border-radius:8px; background:var(--brand); flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:13px;}
+.sb-head .brand-text{min-width:0; overflow:hidden;}
+.sb-head .name{font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-.1px;}
+.sb-head .tagline{font-size:9.5px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;}
+#sidebar.collapsed .brand-text{display:none;}
+#sidebar.collapsed .sb-label{display:none;}
+.sb-nav{flex:1; padding:12px 10px; overflow-y:auto;}
+.sb-item{
+  display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:8px;
+  color:var(--ink-muted); font-size:13.5px; font-weight:500; margin-bottom:2px; border:none; background:none; width:100%; text-align:left;
+}
+.sb-item:hover{background:var(--surface-alt); color:var(--ink);}
+.sb-item.active{background:var(--brand); color:#fff;}
+.sb-item .ic{width:18px; text-align:center; flex-shrink:0;}
+.sb-foot{padding:12px; border-top:1px solid var(--border);}
+.main-wrap{flex:1; display:flex; flex-direction:column; min-width:0;}
+#topbar{
+  height:60px; background:var(--surface); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; padding:0 20px; flex-shrink:0;
+}
+.tb-left{display:flex; align-items:center; gap:14px;}
+.tb-toggle{background:none; border:none; font-size:18px; color:var(--ink-muted); padding:4px;}
+.tb-title{font-weight:700; font-size:16px;}
+.tb-right{display:flex; align-items:center; gap:10px;}
+.tb-icon-btn{background:none; border:none; font-size:17px; color:var(--ink-muted); padding:8px; border-radius:8px;}
+.tb-icon-btn:hover{background:var(--surface-alt);}
+.user-chip{display:flex; align-items:center; gap:8px; padding:6px 10px 6px 6px; border-radius:20px; background:var(--surface-alt); border:1px solid var(--border);}
+.user-chip .av{width:26px; height:26px; border-radius:50%; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;}
+.user-chip .info{line-height:1.2;}
+.user-chip .role{font-size:10px; color:var(--ink-muted); text-transform:uppercase;}
+#content{flex:1; overflow-y:auto; padding:24px;}
+
+/* ============ CARDS / KPI ============ */
+.kpi-grid{display:flex; flex-wrap:nowrap; gap:10px; margin-bottom:24px; overflow-x:auto; padding-bottom:2px;}
+.kpi-card{
+  background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent, var(--border));
+  border-radius:var(--radius); padding:11px 14px; box-shadow:var(--shadow-sm); flex:1 1 0; min-width:0; text-align:left;
+  cursor:pointer; transition:transform .1s ease, box-shadow .15s ease;
+}
+.kpi-card:hover{box-shadow:var(--shadow-md); transform:translateY(-2px);}
+.kpi-card:active{transform:translateY(0) scale(.98);}
+.kpi-card .val{font-size:20px; font-weight:700; font-family:'IBM Plex Mono',monospace; line-height:1.1; color:var(--accent, var(--ink));}
+.kpi-card .lbl{font-size:11px; color:var(--ink-muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+.panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden;}
+.panel-head{display:flex; align-items:center; justify-content:between; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border);}
+.panel-head h3{font-size:15px; font-weight:700;}
+.section-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px;}
+.section-head h2{font-size:19px; font-weight:700; letter-spacing:-.2px;}
+.section-head .desc{font-size:13px; color:var(--ink-muted); margin-top:2px;}
+
+/* ============ FLEET OVERVIEW (Dashboard) ============ */
+.fleet-overview{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:0;}
+.fleet-col{border-right:1px solid var(--border); padding:16px 18px;}
+.fleet-col:last-child{border-right:none;}
+.fleet-col-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+.fleet-col-head span:first-child{font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);}
+.fleet-count{font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:13px; background:var(--surface-alt); border:1px solid var(--border); border-radius:20px; padding:2px 10px; color:var(--brand);}
+.fleet-veh-row{display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px dashed var(--border); cursor:pointer; flex-wrap:wrap;}
+.fleet-veh-row:last-child{border-bottom:none;}
+.fleet-veh-row:hover{opacity:.8;}
+.fleet-veh-model{font-size:12.5px; color:var(--ink-muted); flex:1;}
+@media(max-width:760px){.fleet-col{border-right:none; border-bottom:1px solid var(--border);} .fleet-col:last-child{border-bottom:none;}}
+
+/* ============ TABLE ============ */
+table{width:100%; border-collapse:collapse; font-size:13.5px;}
+th{text-align:left; padding:10px 16px; color:var(--ink-muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid var(--border); background:var(--surface-alt);}
+td{padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
+.plate{font-family:'IBM Plex Mono',monospace; font-weight:600; background:var(--surface-alt); padding:3px 8px; border-radius:5px; border:1px solid var(--border); letter-spacing:.03em;}
+
+/* ============ BADGES ============ */
+.badge{display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:600;}
+.badge::before{content:''; width:6px; height:6px; border-radius:50%; background:currentColor;}
+.badge-disponivel{background:#E8F6EE; color:#1E7B44;}
+.badge-em-uso{background:#EAF2FF; color:#1E5EC7;}
+.badge-em-manutencao{background:#F4E9FE; color:#7A2FC7;}
+.badge-sinistrado{background:#FDEAEA; color:#B8202B;}
+.badge-reserva{background:#F1F2F4; color:#5B6270;}
+:root[data-theme="dark"] .badge-disponivel{background:#0F2A1C; color:#4ADE80;}
+:root[data-theme="dark"] .badge-em-uso{background:#10233F; color:#7CB0FF;}
+:root[data-theme="dark"] .badge-em-manutencao{background:#2B1740; color:#C89CF5;}
+:root[data-theme="dark"] .badge-sinistrado{background:#3A1216; color:#FF8A93;}
+:root[data-theme="dark"] .badge-reserva{background:#23262F; color:#A0A6B2;}
+
+.pri-tag{display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;}
+.pri-tag::before{content:''; width:8px; height:8px; border-radius:2px;}
+.pri-critica::before{background:var(--st-critica);} .pri-critica{color:var(--st-critica);}
+.pri-alta::before{background:var(--st-alta);} .pri-alta{color:var(--st-alta);}
+.pri-media::before{background:var(--st-media);} .pri-media{color:var(--st-media);}
+.pri-baixa::before{background:var(--st-baixa);} .pri-baixa{color:var(--st-baixa);}
+
+/* ticket "service tag" — signature element */
+.ticket-tag{
+  display:inline-flex; align-items:center; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:12.5px;
+  border-radius:6px; overflow:hidden; border:1px solid var(--border);
+}
+.ticket-tag .bar{width:5px; align-self:stretch;}
+.ticket-tag .num{padding:5px 10px; background:var(--surface-alt);}
+
+.status-pill{display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; color:#fff;}
+.st-NOVO{background:var(--st-analise);} .st-CONCLUIDO{background:var(--st-concluido);}
+.st-EM_ANDAMENTO{background:var(--brand); color:var(--brand-ink);} .st-PENDENTE{background:var(--st-alta);}
+.st-AGUARDANDO_PECA{background:var(--st-manutencao);}
+
+/* ============ QUADROS (descrição do serviço / serviço executado) ============ */
+.report-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.report-box{border:1px solid var(--border); border-radius:10px; padding:14px; background:var(--surface-alt);}
+.report-box-head{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); margin-bottom:8px;}
+.report-box-body{font-size:13.5px; line-height:1.5; white-space:pre-wrap;}
+.svc-textarea{width:100%; min-height:90px; padding:0; border:none; background:transparent; color:var(--ink); font-size:13.5px; line-height:1.5; resize:vertical; outline:none; font-family:inherit;}
+@media(max-width:560px){.report-grid{grid-template-columns:1fr;}}
+
+.result-pill{display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; color:#fff;}
+.res-APROVADO{background:var(--st-concluido);}
+.res-RESSALVAS{background:var(--st-alta);}
+.res-REPROVADO{background:var(--st-critica);}
+
+/* ============ INSPECTION CHECKLIST / PHOTOS ============ */
+.chk-row{display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px dashed var(--border); flex-wrap:wrap;}
+.chk-row:last-child{border-bottom:none;}
+.chk-label{flex:1 1 220px; font-size:13px; font-weight:500;}
+.chk-select{min-width:130px; padding:8px 10px; border:1.5px solid var(--border); border-radius:7px; background:var(--surface-alt); color:var(--ink);}
+.chk-obs{flex:1 1 100%; padding:9px 11px; border:1.5px solid var(--border); border-radius:7px; background:var(--surface-alt); color:var(--ink);}
+.photo-slots{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;}
+.photo-slot{border:1.5px dashed var(--border); border-radius:10px; padding:10px; background:var(--surface-alt);}
+.photo-slot label{display:block; font-size:11px; font-weight:600; color:var(--ink-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.03em;}
+.photo-slot input[type=file]{font-size:11px; width:100%;}
+.photo-gallery{display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:10px;}
+.photo-gallery img{width:100%; height:90px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer;}
+
+/* ============ BUTTONS / TOOLBAR ============ */
+.toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+.btn-sm{padding:8px 14px; font-size:13px; border-radius:7px;}
+.btn-xs{padding:5px 10px; font-size:12px; border-radius:6px;}
+.search-input{padding:9px 12px 9px 34px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface-alt); min-width:220px; color:var(--ink); position:relative;}
+.search-wrap{position:relative;}
+.search-wrap .ic{position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--ink-faint); font-size:13px;}
+
+/* ============ MODAL ============ */
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(10,11,14,.55); display:flex; align-items:center; justify-content:center;
+  z-index:100; padding:20px; backdrop-filter:blur(2px);
+}
+.modal-box{background:var(--surface); border-radius:14px; width:100%; max-width:560px; max-height:88vh; display:flex; flex-direction:column; box-shadow:var(--shadow-md); animation:modalFadeIn .18s ease;}
+.modal-box.wide{max-width:720px;}
+@keyframes modalFadeIn{from{opacity:0; transform:translateY(8px) scale(.98);} to{opacity:1; transform:translateY(0) scale(1);}}
+.modal-head{display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--border);}
+.modal-head h3{font-size:16px; font-weight:700;}
+.modal-close{background:none; border:none; font-size:20px; color:var(--ink-muted); line-height:1;}
+.modal-body{padding:20px 22px; overflow-y:auto;}
+.modal-foot{padding:16px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px;}
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.form-grid .full{grid-column:1/-1;}
+@media(max-width:560px){.form-grid{grid-template-columns:1fr;}}
+
+/* ============ TIMELINE (histórico de trocas de veículo) ============ */
+.timeline{list-style:none;}
+.timeline li{display:flex; gap:12px; padding:10px 0; border-bottom:1px dashed var(--border); font-size:13px;}
+.timeline li:last-child{border-bottom:none;}
+.timeline .dot{width:8px; height:8px; border-radius:50%; background:var(--brand); margin-top:5px; flex-shrink:0;}
+.timeline .meta{color:var(--ink-faint); font-size:11.5px;}
+
+/* ============ TOASTS ============ */
+#toastContainer{position:fixed; bottom:20px; right:20px; z-index:200; display:flex; flex-direction:column; gap:8px;}
+.toast{background:var(--ink); color:var(--bg); padding:12px 16px; border-radius:8px; font-size:13.5px; box-shadow:var(--shadow-md); animation:toastIn .2s ease;}
+.toast.err{background:var(--st-critica);}
+.toast.ok{background:var(--st-concluido);}
+@keyframes toastIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+
+.empty-state{padding:48px 20px; text-align:center; color:var(--ink-muted);}
+.empty-state .ic{font-size:30px; margin-bottom:10px; opacity:.5;}
+
+@media(max-width:860px){
+  #sidebar{position:fixed; z-index:90; height:100vh; left:0; top:0;}
+  #sidebar:not(.collapsed){width:230px;}
+  #sidebar.collapsed{width:0; overflow:hidden; border:none;}
+  .kpi-card{padding:9px 11px;}
+  .kpi-card .val{font-size:17px;}
+  .kpi-card .lbl{font-size:10px;}
+}
+
+/* ============ PRINT (Ordem de Serviço) ============ */
+#printArea{color:#111; background:#fff;}
+#printArea h1{font-size:20px; margin-bottom:4px;}
+#printArea h3{font-size:14px; margin:16px 0 6px;}
+#printArea p{font-size:13px; line-height:1.5;}
+#printArea .print-photos{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;}
+#printArea .print-photos img{width:140px; height:auto; border:1px solid #ccc; border-radius:4px;}
+@media print{
+  body *{visibility:hidden;}
+  #printArea, #printArea *{visibility:visible;}
+  #printArea{position:absolute; top:0; left:0; width:100%; padding:24px; display:block !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="mark">LT</div>
+      <div>
+        <div class="name">LUMAR TELECOM</div>
+        <div class="sub">Controle de Frota</div>
+      </div>
+    </div>
+    <form id="loginForm">
+      <div class="field">
+        <label>E-mail</label>
+        <input type="email" id="loginEmail" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password">
+      </div>
+      <div class="login-row">
+        <label><input type="checkbox" id="loginRemember" checked> Permanecer conectado</label>
+        <button type="button" class="link-btn" id="btnForgotPw">Esqueci a senha</button>
+      </div>
+      <button type="submit" class="btn btn-primary" id="btnLogin">Entrar</button>
+      <div id="loginError"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="appShell" class="hidden">
+  <aside id="sidebar">
+    <div class="sb-head">
+      <div class="mark">LT</div>
+      <div class="brand-text">
+        <div class="name">Lumar Telecom</div>
+        <div class="tagline">Controle de Frota</div>
+      </div>
+    </div>
+    <nav class="sb-nav">
+      <button class="sb-item active staff-only-nav" data-view="dashboard"><span class="ic">▤</span><span class="sb-label">Dashboard</span></button>
+      <button class="sb-item staff-only-nav" data-view="vehicles"><span class="ic">🚐</span><span class="sb-label">Veículos</span></button>
+      <button class="sb-item staff-only-nav" data-view="drivers"><span class="ic">🧑‍✈️</span><span class="sb-label">Motoristas</span></button>
+      <button class="sb-item staff-only-nav" data-view="inspections"><span class="ic">📋</span><span class="sb-label">Vistorias</span></button>
+      <button class="sb-item staff-only-nav" data-view="tickets"><span class="ic">🛠</span><span class="sb-label">Abrir O.S</span></button>
+      <button class="sb-item hidden" data-view="meucarro" id="navMeuCarro"><span class="ic">🚐</span><span class="sb-label">Meu veículo</span></button>
+      <button class="sb-item hidden" data-view="admin" id="navAdmin"><span class="ic">⚙</span><span class="sb-label">Administração</span></button>
+    </nav>
+    <div class="sb-foot">
+      <button class="sb-item" id="btnLogout"><span class="ic">⏻</span><span class="sb-label">Sair</span></button>
+    </div>
+  </aside>
+
+  <div class="main-wrap">
+    <header id="topbar">
+      <div class="tb-left">
+        <button class="tb-toggle" id="btnSidebarToggle">☰</button>
+        <div class="tb-title" id="viewTitle">Dashboard</div>
+      </div>
+      <div class="tb-right">
+        <button class="tb-icon-btn" id="btnChangePassword" title="Trocar senha">🔑</button>
+        <button class="tb-icon-btn" id="btnThemeToggle" title="Alternar tema">◐</button>
+        <div class="user-chip">
+          <div class="av" id="userAvatar">?</div>
+          <div class="info">
+            <div id="userName" style="font-size:12.5px; font-weight:600;">—</div>
+            <div class="role" id="userRole">—</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main id="content">
+      <!-- DASHBOARD -->
+      <section id="view-dashboard">
+        <div class="section-head">
+          <div>
+            <h2>Visão geral da frota</h2>
+            <div class="desc">Panorama em tempo real dos veículos e ordens de serviço</div>
+          </div>
+        </div>
+        <div class="kpi-grid" id="kpiGrid"></div>
+
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-head"><h3>Veículos por Frota</h3></div>
+          <div class="fleet-overview" id="fleetOverview"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>Últimas ordens de serviço</h3></div>
+          <div id="dashRecentTickets"></div>
+        </div>
+      </section>
+
+      <!-- MEU VEÍCULO (motorista) -->
+      <section id="view-meucarro" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>Meu veículo</h2>
+            <div class="desc">Informações do veículo vinculado a você e suas ordens de serviço</div>
+          </div>
+        </div>
+        <div id="meuCarroContent"></div>
+      </section>
+
+      <!-- VEHICLES -->
+      <section id="view-vehicles" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>Veículos</h2>
+            <div class="desc" id="vehicleCountDesc">Carregando frota…</div>
+          </div>
+          <div class="toolbar">
+            <div class="search-wrap"><span class="ic">🔍</span><input class="search-input" id="vehicleSearch" placeholder="Placa ou modelo"></div>
+            <select class="search-input" id="vehicleFilterStatus" style="padding-left:12px; min-width:170px;">
+              <option value="">Todos os status</option>
+              <option value="disponivel">Disponível</option>
+              <option value="em-uso">Em uso</option>
+              <option value="em-manutencao">Em manutenção</option>
+              <option value="sinistrado">Sinistrado</option>
+              <option value="reserva">Reserva</option>
+            </select>
+            <select class="search-input" id="vehicleFilterFleet" style="padding-left:12px; min-width:170px;">
+              <option value="">Todas as frotas</option>
+              <option value="LUMAR">Frota Lumar</option>
+              <option value="MOVIDA">Frota Movida</option>
+              <option value="AFONSO">Frota Afonso</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" id="btnSwapVehicle">🔄 Trocar veículo</button>
+            <button class="btn btn-primary btn-sm" id="btnNewVehicle">+ Novo veículo</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr>
+                <th>Placa</th><th>Modelo</th><th>Frota</th><th>KM</th><th>Status</th><th>Motorista</th><th class="admin-only-col hidden" id="vhActionsTh">Ações</th>
+              </tr></thead>
+              <tbody id="vehiclesTbody"></tbody>
+            </table>
+          </div>
+          <div id="vehiclesEmpty" class="empty-state hidden"><div class="ic">🚐</div>Nenhum veículo cadastrado ainda.</div>
+        </div>
+      </section>
+
+      <!-- DRIVERS -->
+      <section id="view-drivers" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>Motoristas</h2>
+            <div class="desc" id="driverCountDesc">Carregando motoristas…</div>
+          </div>
+          <div class="toolbar">
+            <div class="search-wrap"><span class="ic">🔍</span><input class="search-input" id="driverSearch" placeholder="Nome ou CNH"></div>
+            <select class="search-input" id="driverFilterStatus" style="padding-left:12px; min-width:150px;">
+              <option value="">Todos os status</option>
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="btnNewDriver">+ Novo motorista</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr>
+                <th>Nome</th><th>CNH</th><th>Categoria</th><th>Validade CNH</th><th>Telefone</th><th>Veículo atual</th><th>Status</th><th class="admin-only-col hidden" id="drvActionsTh">Ações</th>
+              </tr></thead>
+              <tbody id="driversTbody"></tbody>
+            </table>
+          </div>
+          <div id="driversEmpty" class="empty-state hidden"><div class="ic">🧑‍✈️</div>Nenhum motorista cadastrado ainda.</div>
+        </div>
+      </section>
+
+      <!-- INSPECTIONS -->
+      <section id="view-inspections" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>Vistorias de Veículos</h2>
+            <div class="desc" id="inspectionCountDesc">Carregando vistorias…</div>
+          </div>
+          <div class="toolbar">
+            <div class="search-wrap"><span class="ic">🔍</span><input class="search-input" id="inspectionSearch" placeholder="Placa ou condutor"></div>
+            <select class="search-input" id="inspectionFilterResult" style="padding-left:12px; min-width:190px;">
+              <option value="">Todos os resultados</option>
+              <option value="APROVADO">Aprovado</option>
+              <option value="RESSALVAS">Aprovado c/ ressalvas</option>
+              <option value="REPROVADO">Reprovado</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="btnNewInspection">+ Nova vistoria</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr>
+                <th>Data</th><th>Veículo</th><th>Condutor</th><th>KM</th><th>Resultado</th><th class="admin-only-col hidden" id="inspActionsTh">Ações</th>
+              </tr></thead>
+              <tbody id="inspectionsTbody"></tbody>
+            </table>
+          </div>
+          <div id="inspectionsEmpty" class="empty-state hidden"><div class="ic">📋</div>Nenhuma vistoria registrada ainda.</div>
+        </div>
+      </section>
+
+      <!-- TICKETS -->
+      <section id="view-tickets" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>Ordens de Serviço</h2>
+            <div class="desc" id="ticketCountDesc">Carregando ordens de serviço…</div>
+          </div>
+          <div class="toolbar">
+            <select class="search-input" id="ticketFilterStatus" style="padding-left:12px; min-width:190px;">
+              <option value="">Todos os status</option>
+              <option value="NOVO">Aberta</option>
+              <option value="EM_ANDAMENTO">Em andamento</option>
+              <option value="PENDENTE">Pendente</option>
+              <option value="AGUARDANDO_PECA">Aguardando peça</option>
+              <option value="CONCLUIDO">Concluída</option>
+            </select>
+            <select class="search-input" id="ticketFilterPriority" style="padding-left:12px; min-width:160px;">
+              <option value="">Todas as prioridades</option>
+              <option value="CRITICA">Crítica</option>
+              <option value="ALTA">Alta</option>
+              <option value="MEDIA">Média</option>
+              <option value="BAIXA">Baixa</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="btnNewTicket">+ Abrir O.S</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr>
+                <th>O.S.</th><th>Veículo</th><th>Prioridade</th><th>Status</th><th>Aberto em</th><th class="admin-only-col hidden" id="tkActionsTh">Ações</th>
+              </tr></thead>
+              <tbody id="ticketsTbody"></tbody>
+            </table>
+          </div>
+          <div id="ticketsEmpty" class="empty-state hidden"><div class="ic">🛠</div>Nenhuma O.S. registrada ainda. Bom sinal — ou ninguém abriu a primeira.</div>
+        </div>
+      </section>
+
+      <!-- ADMIN (roles) -->
+      <section id="view-admin" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>Administração</h2>
+            <div class="desc">Atribuir perfil de acesso a um usuário já criado no Firebase Auth</div>
+          </div>
+        </div>
+        <div class="panel" style="padding:20px; margin-bottom:20px;">
+          <p style="font-size:13px; color:var(--ink-muted); margin-bottom:16px; line-height:1.5;">
+            Crie a conta de login (e-mail/senha) direto no <strong>Console do Firebase → Authentication</strong>.
+            Depois cole o UID aqui para definir nome e perfil de acesso dessa conta dentro do sistema.
+            Se o perfil for <strong>Motorista</strong>, escolha também qual motorista cadastrado é essa pessoa —
+            é isso que faz o login dela só abrir o veículo vinculado a ele.
+          </p>
+          <div class="form-grid">
+            <div class="field full"><label>UID do usuário (Firebase Auth)</label><input id="admUid"></div>
+            <div class="field"><label>Nome</label><input id="admName"></div>
+            <div class="field"><label>E-mail (só pra referência)</label><input id="admEmail" type="email"></div>
+            <div class="field">
+              <label>Perfil</label>
+              <select id="admRole">
+                <option value="admin">Administrador</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="mecanico">Mecânico</option>
+                <option value="motorista">Motorista</option>
+              </select>
+            </div>
+            <div class="field hidden" id="admDriverField">
+              <label>Motorista vinculado</label>
+              <select id="admDriverId"><option value="">Selecione…</option></select>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:16px;">
+            <button class="btn btn-primary btn-sm" id="btnSaveUserRole">Salvar perfil</button>
+            <button class="btn btn-ghost btn-sm" id="btnClearUserRoleForm">Limpar formulário</button>
+          </div>
+        </div>
+        <div class="panel" style="margin-bottom:20px;">
+          <div class="panel-head"><h3>Usuários cadastrados</h3></div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr>
+                <th>Nome</th><th>E-mail</th><th>Perfil</th><th>Motorista vinculado</th><th>Senha alterada</th><th>Ações</th>
+              </tr></thead>
+              <tbody id="rolesTbody"></tbody>
+            </table>
+          </div>
+          <div id="rolesEmpty" class="empty-state hidden"><div class="ic">👤</div>Nenhum usuário vinculado ainda.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<!-- ============ MODAL: VEHICLE ============ -->
+<div class="modal-backdrop hidden" id="modalVehicle">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="vehicleModalTitle">Novo veículo</h3><button class="modal-close" data-close="modalVehicle">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="vhId">
+      <div class="form-grid">
+        <div class="field"><label>Placa *</label><input id="vhPlate" required style="text-transform:uppercase;"></div>
+        <div class="field"><label>Marca</label><input id="vhBrand"></div>
+        <div class="field"><label>Modelo *</label><input id="vhModel" required></div>
+        <div class="field"><label>Ano</label><input id="vhYear" type="number" min="1980" max="2035"></div>
+        <div class="field"><label>KM atual</label><input id="vhKm" type="number" min="0"></div>
+        <div class="field">
+          <label>Frota *</label>
+          <select id="vhFleet" required>
+            <option value="LUMAR">Frota Lumar</option>
+            <option value="MOVIDA">Frota Movida</option>
+            <option value="AFONSO">Frota Afonso</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="vhStatus">
+            <option value="disponivel">Disponível</option>
+            <option value="em-uso">Em uso</option>
+            <option value="em-manutencao">Em manutenção</option>
+            <option value="sinistrado">Sinistrado</option>
+            <option value="reserva">Reserva</option>
+          </select>
+        </div>
+        <div class="field"><label>Motorista</label><select id="vhDriver"><option value="">— Nenhum —</option></select></div>
+        <div class="field full"><label>Centro de custo</label><input id="vhCostCenter"></div>
+        <div class="field full"><label>Foto do veículo</label><input type="file" id="vhPhoto" accept="image/*"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalVehicle">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveVehicle">Salvar veículo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: VEHICLE DETAIL (read-only) ============ -->
+<div class="modal-backdrop hidden" id="modalVehicleDetail">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="vdTitle">Veículo</h3><button class="modal-close" data-close="modalVehicleDetail">×</button></div>
+    <div class="modal-body">
+      <div id="vdPhotoWrap" style="margin-bottom:14px;"></div>
+      <div id="vdMeta" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center;"></div>
+      <div id="vdInfoGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13.5px; margin-bottom:16px;"></div>
+      <div id="vdSwapHistoryWrap"></div>
+    </div>
+    <div class="modal-foot" id="vdFoot"></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: VEHICLE SWAP (troca de veículo) ============ -->
+<div class="modal-backdrop hidden" id="modalVehicleSwap">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Trocar veículo</h3><button class="modal-close" data-close="modalVehicleSwap">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field full">
+          <label>Veículo / condutor a trocar *</label>
+          <select id="vsFromVehicle" required></select>
+        </div>
+        <div class="field full">
+          <label>Veículo substituto *</label>
+          <select id="vsToVehicle" required></select>
+        </div>
+        <div class="field">
+          <label>Motivo da troca *</label>
+          <select id="vsReason" required>
+            <option value="Manutenção">Manutenção</option>
+            <option value="Sinistro">Sinistro / Acidente</option>
+            <option value="Outro">Outro motivo</option>
+          </select>
+        </div>
+        <div class="field"><label>Motorista</label><select id="vsDriverId"><option value="">— Nenhum —</option></select></div>
+        <div class="field full"><label>Observações</label><textarea id="vsObservations" rows="3" style="width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--ink);"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalVehicleSwap">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveVehicleSwap">Confirmar troca</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: DRIVER (cadastro/edição) ============ -->
+<div class="modal-backdrop hidden" id="modalDriver">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="driverModalTitle">Novo motorista</h3><button class="modal-close" data-close="modalDriver">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="drvId">
+      <div class="form-grid">
+        <div class="field full"><label>Nome *</label><input id="drvName" required></div>
+        <div class="field"><label>CNH (número) *</label><input id="drvCnh" required></div>
+        <div class="field">
+          <label>Categoria</label>
+          <select id="drvCnhCategory">
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="AB">AB</option>
+          </select>
+        </div>
+        <div class="field"><label>Validade da CNH</label><input id="drvCnhValidity" type="date"></div>
+        <div class="field"><label>Telefone</label><input id="drvPhone" placeholder="(00) 00000-0000"></div>
+        <div class="field">
+          <label>Status</label>
+          <select id="drvStatus">
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalDriver">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveDriver">Salvar motorista</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: DRIVER DETAIL (read-only) ============ -->
+<div class="modal-backdrop hidden" id="modalDriverDetail">
+  <div class="modal-box wide">
+    <div class="modal-head"><h3 id="ddTitle">Motorista</h3><button class="modal-close" data-close="modalDriverDetail">×</button></div>
+    <div class="modal-body">
+      <div id="ddMeta" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center;"></div>
+      <div id="ddInfoGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13.5px; margin-bottom:18px;"></div>
+      <h4 style="font-size:13px; margin-bottom:8px;">Vistorias realizadas</h4>
+      <div id="ddInspections" style="margin-bottom:18px;"></div>
+      <h4 style="font-size:13px; margin-bottom:8px;">Histórico de trocas de veículo</h4>
+      <div id="ddSwaps"></div>
+    </div>
+    <div class="modal-foot" id="ddFoot"></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: NEW TICKET (ABRIR O.S) ============ -->
+<div class="modal-backdrop hidden" id="modalTicket">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Abrir O.S</h3><button class="modal-close" data-close="modalTicket">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field full">
+          <label>Veículo *</label>
+          <select id="tkVehicle" required></select>
+        </div>
+        <div class="field">
+          <label>Prioridade *</label>
+          <select id="tkPriority" required>
+            <option value="BAIXA">Baixa</option>
+            <option value="MEDIA" selected>Média</option>
+            <option value="ALTA">Alta</option>
+            <option value="CRITICA">Crítica</option>
+          </select>
+        </div>
+        <div class="field"><label>KM no momento</label><input id="tkKm" type="number" min="0"></div>
+        <div class="field full"><label><input type="checkbox" id="tkParado"> Veículo está parado / inoperante</label></div>
+        <div class="field full"><label>Localização</label><input id="tkLocation" placeholder="Ex.: Base Teresina, Zona Sul"></div>
+        <div class="field full">
+          <div class="report-box">
+            <div class="report-box-head">📋 Descrição do serviço *</div>
+            <textarea id="tkDescription" rows="4" required class="svc-textarea" placeholder="Descreva o serviço necessário…"></textarea>
+          </div>
+        </div>
+        <div class="field full"><label>Foto (opcional)</label><input type="file" id="tkPhoto" accept="image/*"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalTicket">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveTicket">Abrir O.S</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: TICKET DETAIL ============ -->
+<div class="modal-backdrop hidden" id="modalTicketDetail">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h3 id="tdTitle">O.S.</h3>
+      <button class="modal-close" data-close="modalTicketDetail">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="tdMeta" style="margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;"></div>
+      <div id="tdPhotoWrap" style="margin-bottom:14px;"></div>
+
+      <div class="report-grid" id="tdReportGrid" style="margin-bottom:18px;"></div>
+
+      <div id="tdStatusActions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: FECHAR O.S. ============ -->
+<div class="modal-backdrop hidden" id="modalTicketClose">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Fechar O.S.</h3><button class="modal-close" data-close="modalTicketClose">×</button></div>
+    <div class="modal-body">
+      <div class="report-grid" style="margin-bottom:16px;">
+        <div class="report-box">
+          <div class="report-box-head">📋 Descrição do serviço</div>
+          <div class="report-box-body" id="tcOriginalDescription"></div>
+        </div>
+        <div class="report-box">
+          <div class="report-box-head">🔧 Serviço executado *</div>
+          <textarea id="tcDescription" rows="5" required class="svc-textarea" placeholder="Descreva o que foi feito…"></textarea>
+        </div>
+      </div>
+      <div class="field full"><label>Fotos do serviço (opcional, várias)</label><input type="file" id="tcPhotos" accept="image/*" multiple></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalTicketClose">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnConfirmCloseTicket">Confirmar fechamento</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: TROCAR SENHA ============ -->
+<div class="modal-backdrop hidden" id="modalChangePassword">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Trocar senha</h3><button class="modal-close" data-close="modalChangePassword">×</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Senha atual *</label><input type="password" id="cpCurrentPassword" required></div>
+      <div class="field"><label>Nova senha *</label><input type="password" id="cpNewPassword" required></div>
+      <div class="field"><label>Confirmar nova senha *</label><input type="password" id="cpConfirmPassword" required></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalChangePassword">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnConfirmChangePassword">Salvar nova senha</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: NEW INSPECTION ============ -->
+<div class="modal-backdrop hidden" id="modalInspection">
+  <div class="modal-box wide">
+    <div class="modal-head"><h3>Nova vistoria</h3><button class="modal-close" data-close="modalInspection">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field full">
+          <label>Veículo / Frota responsável *</label>
+          <select id="inspVehicle" required></select>
+        </div>
+        <div class="field"><label>Condutor responsável *</label><select id="inspDriverId" required><option value="">Selecione…</option></select></div>
+        <div class="field"><label>Data/hora</label><input id="inspDate" type="datetime-local"></div>
+        <div class="field"><label>KM atual *</label><input id="inspKm" type="number" min="0" required></div>
+
+        <div class="field full">
+          <label>Checklist de itens</label>
+          <div id="inspChecklist"></div>
+        </div>
+
+        <div class="field full">
+          <label>Fotos da vistoria</label>
+          <div class="photo-slots">
+            <div class="photo-slot"><label>Frente</label><input type="file" id="inspPhotoFrente" accept="image/*"></div>
+            <div class="photo-slot"><label>Traseira</label><input type="file" id="inspPhotoTraseira" accept="image/*"></div>
+            <div class="photo-slot"><label>Lateral esquerda</label><input type="file" id="inspPhotoLatEsq" accept="image/*"></div>
+            <div class="photo-slot"><label>Lateral direita</label><input type="file" id="inspPhotoLatDir" accept="image/*"></div>
+            <div class="photo-slot"><label>Painel / KM</label><input type="file" id="inspPhotoPainel" accept="image/*"></div>
+          </div>
+        </div>
+        <div class="field full"><label>Fotos adicionais / avarias (opcional, várias)</label><input type="file" id="inspExtraPhotos" accept="image/*" multiple></div>
+
+        <div class="field full"><label><input type="checkbox" id="inspRetido"> Veículo deve ficar retido (não pode circular) — reprova automaticamente a vistoria</label></div>
+        <div class="field full"><label><input type="checkbox" id="inspAutoTicket" checked> Abrir O.S. automaticamente para os itens marcados como "Problema"</label></div>
+        <div class="field full"><label>Observações gerais</label><textarea id="inspObservations" rows="3" style="width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--ink);"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalInspection">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveInspection">Salvar vistoria</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: INSPECTION DETAIL ============ -->
+<div class="modal-backdrop hidden" id="modalInspectionDetail">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h3 id="idTitle">Vistoria</h3>
+      <button class="modal-close" data-close="modalInspectionDetail">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="idMeta" style="margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;"></div>
+
+      <h4 style="font-size:13px; margin-bottom:8px;">Checklist</h4>
+      <div id="idChecklist" style="margin-bottom:18px;"></div>
+
+      <h4 style="font-size:13px; margin-bottom:8px;">Fotos</h4>
+      <div class="photo-gallery" id="idPhotos" style="margin-bottom:18px;"></div>
+
+      <h4 style="font-size:13px; margin-bottom:8px;">Observações</h4>
+      <p id="idObservations" style="font-size:13.5px; line-height:1.5; color:var(--ink-muted); margin-bottom:16px;"></p>
+
+      <div id="idGeneratedTickets"></div>
+    </div>
+  </div>
+</div>
+
+<div id="printArea" class="hidden"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import {
+  getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+  query, where, onSnapshot, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCFm3Rcw85uzduOb8yXFVSSuBvNk1nTTFM",
+  authDomain: "frotalumar.firebaseapp.com",
+  projectId: "frotalumar",
+  storageBucket: "frotalumar.firebasestorage.app",
+  messagingSenderId: "488907322514",
+  appId: "1:488907322514:web:957034b6ff5ae488e0a24b"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
+
+/* ============ STATE (sincronizado com o Firestore) ============ */
+let currentUser = null;
+let vehicles = [];
+let drivers = [];
+let tickets = [];
+let inspections = [];
+let vehicleSwaps = [];
+let myVehicle = null;
+let myTickets = [];
+let allRoles = [];
+let unsubscribers = [];
+
+const ROLE_LABEL = {admin:'Administrador', supervisor:'Supervisor', mecanico:'Mecânico', motorista:'Motorista'};
+const PRIORITY_LABEL = {CRITICA:'Crítica', ALTA:'Alta', MEDIA:'Média', BAIXA:'Baixa'};
+const STATUS_LABEL = {NOVO:'Aberta', EM_ANDAMENTO:'Em andamento', PENDENTE:'Pendente', AGUARDANDO_PECA:'Aguardando peça', CONCLUIDO:'Concluída'};
+const OPEN_STATUS_KEYS = ['NOVO','EM_ANDAMENTO','PENDENTE','AGUARDANDO_PECA'];
+const VEHICLE_STATUS_LABEL = {
+  'disponivel':'Disponível', 'em-uso':'Em uso', 'em-manutencao':'Em manutenção',
+  'sinistrado':'Sinistrado', 'reserva':'Reserva'
+};
+const FLEET_LABEL = {LUMAR:'Frota Lumar', MOVIDA:'Frota Movida', AFONSO:'Frota Afonso'};
+const FLEET_KEYS = ['LUMAR','MOVIDA','AFONSO'];
+
+function driverName(id){
+  const d = drivers.find(x=>x.id===id);
+  return d ? d.name : '—';
+}
+function isCnhExpired(d){
+  return !!(d.cnhValidity && new Date(d.cnhValidity) < new Date());
+}
+function populateDriverSelects(){
+  const optionalOptions = '<option value="">— Nenhum —</option>' + drivers.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+  const requiredOptions = '<option value="">Selecione…</option>' + drivers.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+  document.getElementById('vhDriver').innerHTML = optionalOptions;
+  document.getElementById('vsDriverId').innerHTML = optionalOptions;
+  document.getElementById('inspDriverId').innerHTML = requiredOptions;
+}
+
+/* ---- vistorias ---- */
+const CHECKLIST_ITEMS = [
+  {key:'pneus', label:'Pneus (estado e calibragem)', category:'Pneus'},
+  {key:'freios', label:'Freios', category:'Freios'},
+  {key:'luzes', label:'Luzes, setas e lanternas', category:'Elétrica'},
+  {key:'fluidos', label:'Óleo e fluidos (nível / vazamento)', category:'Troca de óleo'},
+  {key:'cintos', label:'Cintos de segurança', category:'Mecânica'},
+  {key:'documentacao', label:'Documentação (CRLV / tacógrafo)', category:'Documentação'},
+  {key:'equipamentos', label:'Equipamentos obrigatórios (extintor, triângulo, macaco)', category:'Outro'},
+  {key:'avarias', label:'Lataria, vidros e retrovisores (avarias)', category:'Funilaria'},
+  {key:'limpeza', label:'Limpeza interna e externa', category:null},
+];
+const RESULT_LABEL = {APROVADO:'Aprovado', RESSALVAS:'Aprovado c/ ressalvas', REPROVADO:'Reprovado'};
+const CHECKLIST_STATUS_LABEL = {ok:'OK', problema:'Problema', na:'N/A'};
+const PHOTO_SLOT_LABEL = {frente:'Frente', traseira:'Traseira', lateralEsq:'Lateral esquerda', lateralDir:'Lateral direita', painel:'Painel / KM'};
+
+
+function toast(msg, type=''){
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+}
+
+function fmtDate(ts){
+  if(!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function vehiclePlaceholderPhoto(v){
+  const plate = escapeHtml(v.plate||'');
+  const modelText = escapeHtml(((v.brand?v.brand+' ':'')+(v.model||'')).trim());
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360">
+    <rect width="100%" height="100%" fill="#0D1626"/>
+    <text x="50%" y="42%" font-size="72" text-anchor="middle" dominant-baseline="middle">🚐</text>
+    <text x="50%" y="68%" font-size="30" text-anchor="middle" fill="#22D3EE" font-family="monospace" font-weight="700">${plate}</text>
+    <text x="50%" y="80%" font-size="18" text-anchor="middle" fill="#8B96AC" font-family="sans-serif">${modelText}</text>
+  </svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+/* ============ AUTENTICAÇÃO ============ */
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch(err){
+    errEl.textContent = 'Não foi possível entrar. Verifique e-mail e senha.';
+    errEl.style.display = 'block';
+    console.error(err);
+  }
+});
+
+document.getElementById('btnLogout').addEventListener('click', ()=>{
+  signOut(auth);
+});
+
+onAuthStateChanged(auth, async (user)=>{
+  unsubscribers.forEach(fn=>fn());
+  unsubscribers = [];
+  if(!user){
+    currentUser = null;
+    document.getElementById('appShell').classList.add('hidden');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    return;
+  }
+  let roleSnap;
+  try {
+    roleSnap = await getDoc(doc(db,'roles', user.uid));
+  } catch(err){
+    console.error(err);
+    document.getElementById('loginError').textContent = 'Erro de permissão ao ler seu perfil. As regras do Firestore já foram publicadas?';
+    document.getElementById('loginError').style.display = 'block';
+    await signOut(auth);
+    return;
+  }
+  if(!roleSnap.exists()){
+    document.getElementById('loginError').textContent = 'Seu usuário ainda não tem um perfil configurado. Peça para o administrador te cadastrar.';
+    document.getElementById('loginError').style.display = 'block';
+    await signOut(auth);
+    return;
+  }
+  const roleData = roleSnap.data();
+  currentUser = { uid:user.uid, email:user.email, name:roleData.name || user.email, role:roleData.role, driverId:roleData.driverId || null };
+  if(!roleData.email){
+    setDoc(doc(db,'roles',user.uid), {email:user.email}, {merge:true}).catch(err=>console.error(err));
+  }
+  boot();
+});
+
+/* ============ BOOT ============ */
+function boot(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  document.getElementById('userName').textContent = currentUser.name;
+  document.getElementById('userRole').textContent = currentUser.role;
+  const initials = currentUser.name.replace(/\(.*?\)/g,'').trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('userAvatar').textContent = initials || '—';
+
+  const isMotorista = currentUser.role === 'motorista';
+  const isAdmin = currentUser.role === 'admin';
+  document.getElementById('navAdmin').classList.toggle('hidden', !isAdmin);
+  document.querySelectorAll('.staff-only-nav').forEach(el=>el.classList.toggle('hidden', isMotorista));
+  document.getElementById('navMeuCarro').classList.toggle('hidden', !isMotorista);
+  document.querySelectorAll('.admin-only-col').forEach(el=>el.classList.toggle('hidden', !isAdmin));
+
+  if(isMotorista){
+    attachMotoristaListeners();
+    switchView('meucarro');
+  } else {
+    attachStaffListeners();
+    renderInspectionChecklistForm();
+    switchView('dashboard');
+  }
+}
+
+/* ============ LISTENERS FIRESTORE ============ */
+function attachStaffListeners(){
+  unsubscribers.push(onSnapshot(collection(db,'vehicles'), snap=>{
+    vehicles = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    populateDriverSelects(); populateVehicleSelect();
+    renderVehicles(); renderFleetOverview(); renderDashboard();
+  }, err=>toast('Erro lendo veículos: '+err.message, 'err')));
+
+  unsubscribers.push(onSnapshot(collection(db,'drivers'), snap=>{
+    drivers = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    populateDriverSelects(); populateAdminDriverSelect();
+    renderDrivers(); renderVehicles(); renderFleetOverview(); renderRolesTable();
+  }, err=>toast('Erro lendo motoristas: '+err.message, 'err')));
+
+  unsubscribers.push(onSnapshot(collection(db,'roles'), snap=>{
+    allRoles = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderRolesTable();
+  }, err=>toast('Erro lendo usuários: '+err.message, 'err')));
+
+  unsubscribers.push(onSnapshot(collection(db,'tickets'), snap=>{
+    tickets = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderTickets(); renderDashboard();
+  }, err=>toast('Erro lendo O.S.: '+err.message, 'err')));
+
+  unsubscribers.push(onSnapshot(collection(db,'inspections'), snap=>{
+    inspections = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderInspections();
+  }, err=>toast('Erro lendo vistorias: '+err.message, 'err')));
+
+  unsubscribers.push(onSnapshot(collection(db,'vehicleSwaps'), snap=>{
+    vehicleSwaps = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  }, err=>toast('Erro lendo trocas: '+err.message, 'err')));
+}
+
+function attachMotoristaListeners(){
+  if(!currentUser.driverId){
+    myVehicle = null; myTickets = [];
+    renderMeuCarro();
+    return;
+  }
+  const vq = query(collection(db,'vehicles'), where('driverId','==', currentUser.driverId));
+  const unsubV = onSnapshot(vq, snap=>{
+    myVehicle = snap.empty ? null : {id:snap.docs[0].id, ...snap.docs[0].data()};
+    renderMeuCarro();
+    if(myVehicle){
+      const tq = query(collection(db,'tickets'), where('vehicleId','==', myVehicle.id));
+      const unsubT = onSnapshot(tq, tsnap=>{
+        myTickets = tsnap.docs.map(d=>({id:d.id, ...d.data()}));
+        renderMeuCarro();
+      }, err=>toast('Erro lendo suas O.S.: '+err.message, 'err'));
+      unsubscribers.push(unsubT);
+    } else {
+      myTickets = [];
+      renderMeuCarro();
+    }
+  }, err=>toast('Erro lendo seu veículo: '+err.message, 'err'));
+  unsubscribers.push(unsubV);
+}
+
+/* ============ NAVIGATION ============ */
+document.querySelectorAll('.sb-item[data-view]').forEach(btn=>{
+  btn.addEventListener('click', ()=>switchView(btn.dataset.view));
+});
+function switchView(view, filter){
+  document.querySelectorAll('.sb-item[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
+  ['dashboard','vehicles','drivers','inspections','tickets','admin','meucarro'].forEach(v=>{
+    document.getElementById('view-'+v).classList.toggle('hidden', v!==view);
+  });
+  const titles = {dashboard:'Dashboard', vehicles:'Veículos', drivers:'Motoristas', inspections:'Vistorias de Veículos', tickets:'Ordens de Serviço', admin:'Administração', meucarro:'Meu veículo'};
+  document.getElementById('viewTitle').textContent = titles[view];
+
+  if(view==='vehicles'){
+    document.getElementById('vehicleFilterStatus').value = filter || '';
+    renderVehicles();
+  }
+  if(view==='tickets'){
+    const priorities = ['CRITICA','ALTA','MEDIA','BAIXA'];
+    if(filter && priorities.includes(filter)){
+      document.getElementById('ticketFilterPriority').value = filter;
+      document.getElementById('ticketFilterStatus').value = '';
+    } else {
+      document.getElementById('ticketFilterStatus').value = filter || '';
+      document.getElementById('ticketFilterPriority').value = '';
+    }
+    renderTickets();
+  }
+  if(view==='meucarro'){
+    renderMeuCarro();
+  }
+}
+window.switchView = switchView;
+
+/* ============ MEU VEÍCULO (visão do motorista) ============ */
+function renderMeuCarro(){
+  const wrap = document.getElementById('meuCarroContent');
+  if(!wrap) return;
+  const v = myVehicle;
+  if(!v){
+    wrap.innerHTML = `<div class="panel"><div class="empty-state"><div class="ic">🚐</div>Nenhum veículo vinculado ao seu usuário ainda. Fale com o administrador.</div></div>`;
+    return;
+  }
+  const myTix = [...myTickets].sort((a,b)=>b.createdAt-a.createdAt);
+  wrap.innerHTML = `
+    <div class="panel" style="padding:20px; margin-bottom:20px;">
+      <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:14px;">
+        <span class="plate" style="font-size:16px;">${escapeHtml(v.plate)}</span>
+        <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
+        <span style="font-size:13px; color:var(--ink-muted);">${FLEET_LABEL[v.fleet] || ''}</span>
+      </div>
+      <div style="font-size:14px; margin-bottom:4px;"><strong>${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</strong></div>
+      <div style="font-size:13px; color:var(--ink-muted);">KM atual: ${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
+      <button type="button" class="btn btn-primary btn-sm" style="margin-top:16px;" id="btnMeuCarroAbrirOS">+ Abrir O.S para este veículo</button>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>Minhas ordens de serviço</h3></div>
+      <div style="overflow-x:auto;"><table>
+        <thead><tr><th>O.S.</th><th>Prioridade</th><th>Status</th><th>Aberto em</th></tr></thead>
+        <tbody>${myTix.length ? myTix.map(t=>`
+          <tr class="row-click" onclick="openTicketDetail('${t.id}')">
+            <td class="mono">${escapeHtml(t.ticketNumber)}</td>
+            <td><span class="pri-tag pri-${(t.priority||'').toLowerCase()}">${PRIORITY_LABEL[t.priority]||t.priority}</span></td>
+            <td><span class="status-pill st-${t.status}">${STATUS_LABEL[t.status]||t.status}</span></td>
+            <td>${fmtDate(t.createdAt)}</td>
+          </tr>`).join('') : `<tr><td colspan="4" style="text-align:center; color:var(--ink-muted); padding:24px;">Nenhuma O.S. aberta.</td></tr>`}
+        </tbody>
+      </table></div>
+    </div>
+  `;
+  document.getElementById('btnMeuCarroAbrirOS').addEventListener('click', openTicketModalForMyVehicle);
+}
+
+function openTicketModalForMyVehicle(){
+  if(!myVehicle){ toast('Nenhum veículo vinculado ao seu usuário.', 'err'); return; }
+  const sel = document.getElementById('tkVehicle');
+  sel.innerHTML = `<option value="${myVehicle.id}">${escapeHtml(myVehicle.plate)} — ${escapeHtml((myVehicle.brand?myVehicle.brand+' ':'')+(myVehicle.model||''))}</option>`;
+  sel.value = myVehicle.id;
+  sel.disabled = true;
+  document.getElementById('tkPriority').value = 'MEDIA';
+  document.getElementById('tkKm').value = myVehicle.km || '';
+  document.getElementById('tkParado').checked = false;
+  document.getElementById('tkLocation').value = '';
+  document.getElementById('tkDescription').value = '';
+  document.getElementById('tkPhoto').value = '';
+  openModal('modalTicket');
+}
+document.getElementById('btnSidebarToggle').addEventListener('click', ()=>{
+  document.getElementById('sidebar').classList.toggle('collapsed');
+});
+document.getElementById('btnThemeToggle').addEventListener('click', ()=>{
+  const html = document.documentElement;
+  html.setAttribute('data-theme', html.getAttribute('data-theme')==='light' ? 'dark' : 'light');
+});
+
+/* ============ TROCAR SENHA ============ */
+document.getElementById('btnChangePassword').addEventListener('click', ()=>{
+  document.getElementById('cpCurrentPassword').value = '';
+  document.getElementById('cpNewPassword').value = '';
+  document.getElementById('cpConfirmPassword').value = '';
+  openModal('modalChangePassword');
+});
+document.getElementById('btnConfirmChangePassword').addEventListener('click', async ()=>{
+  const current = document.getElementById('cpCurrentPassword').value;
+  const next = document.getElementById('cpNewPassword').value;
+  const confirmVal = document.getElementById('cpConfirmPassword').value;
+  if(!current || !next){ toast('Preencha a senha atual e a nova senha.', 'err'); return; }
+  if(next.length < 6){ toast('A nova senha precisa ter pelo menos 6 caracteres.', 'err'); return; }
+  if(next !== confirmVal){ toast('A confirmação não confere com a nova senha.', 'err'); return; }
+  try {
+    const cred = EmailAuthProvider.credential(auth.currentUser.email, current);
+    await reauthenticateWithCredential(auth.currentUser, cred);
+    await updatePassword(auth.currentUser, next);
+    await setDoc(doc(db,'roles',currentUser.uid), {passwordChanged:true, passwordChangedAt: Date.now()}, {merge:true});
+    toast('Senha alterada com sucesso.', 'ok');
+    closeModal('modalChangePassword');
+  } catch(err){
+    toast('Não foi possível trocar a senha. Confira a senha atual. ('+(err.code||err.message)+')', 'err');
+  }
+});
+
+/* ============ DASHBOARD ============ */
+function renderDashboard(){
+  const totalV = vehicles.length;
+  const disponiveis = vehicles.filter(v=>v.status==='disponivel').length;
+  const emManutencao = vehicles.filter(v=>v.status==='em-manutencao').length;
+  const abertos = tickets.filter(t=>t.status!=='CONCLUIDO').length;
+  const criticos = tickets.filter(t=>t.priority==='CRITICA' && t.status!=='CONCLUIDO').length;
+  const concluidos = tickets.filter(t=>t.status==='CONCLUIDO').length;
+
+  const cards = [
+    {val: totalV, lbl:'Veículos na frota', view:'vehicles', accent:'var(--brand)'},
+    {val: disponiveis, lbl:'Disponíveis', view:'vehicles', filter:'disponivel', accent:'var(--st-concluido)'},
+    {val: emManutencao, lbl:'Em manutenção', view:'vehicles', filter:'em-manutencao', accent:'var(--st-manutencao)'},
+    {val: abertos, lbl:'Chamados abertos', view:'tickets', accent:'var(--st-alta)'},
+    {val: criticos, lbl:'Chamados críticos', view:'tickets', filter:'CRITICA', accent:'var(--st-critica)'},
+    {val: concluidos, lbl:'Concluídos', view:'tickets', filter:'CONCLUIDO', accent:'var(--st-concluido)'},
+  ];
+  document.getElementById('kpiGrid').innerHTML = cards.map(c=>`
+    <button type="button" class="kpi-card" style="--accent:${c.accent}" onclick="switchView('${c.view}', ${c.filter ? `'${c.filter}'` : 'null'})">
+      <div class="val">${c.val}</div>
+      <div class="lbl">${c.lbl}</div>
+    </button>`).join('');
+
+  const recent = [...tickets].sort((a,b)=>b.createdAt-a.createdAt).slice(0,6);
+  const el = document.getElementById('dashRecentTickets');
+  if(recent.length===0){
+    el.innerHTML = `<div class="empty-state"><div class="ic">🛠</div>Nenhuma ordem de serviço registrada ainda.</div>`;
+    return;
+  }
+  el.innerHTML = `<table><tbody>` + recent.map(t=>`
+    <tr class="row-click" onclick="openTicketDetail('${t.id}')">
+      <td>${ticketTagHtml(t)}</td>
+      <td>${escapeHtml(t.vehiclePlate||'—')}</td>
+      <td><span class="pri-tag pri-${t.priority.toLowerCase()}">${PRIORITY_LABEL[t.priority]}</span></td>
+      <td><span class="status-pill st-${t.status}">${STATUS_LABEL[t.status]}</span></td>
+    </tr>`).join('') + `</tbody></table>`;
+}
+
+/* ============ VEHICLES ============ */
+function populateVehicleSelect(){
+  const options = vehicles.map(v=>`<option value="${v.id}">${escapeHtml(v.plate)} — ${escapeHtml(v.model||'')}</option>`).join('');
+  document.getElementById('tkVehicle').innerHTML = options;
+  document.getElementById('inspVehicle').innerHTML = options;
+}
+
+function renderVehicles(){
+  const search = document.getElementById('vehicleSearch').value.toLowerCase();
+  const statusFilter = document.getElementById('vehicleFilterStatus').value;
+  const fleetFilter = document.getElementById('vehicleFilterFleet').value;
+  const isAdmin = currentUser.role === 'admin';
+  const filtered = vehicles.filter(v =>
+    (!statusFilter || v.status===statusFilter) &&
+    (!fleetFilter || v.fleet===fleetFilter) &&
+    (!search || (v.plate||'').toLowerCase().includes(search) || (v.model||'').toLowerCase().includes(search))
+  );
+  document.getElementById('vehicleCountDesc').textContent = `${vehicles.length} veículo(s) cadastrado(s)`;
+  document.getElementById('vehiclesEmpty').classList.toggle('hidden', filtered.length>0);
+  document.getElementById('vehiclesTbody').innerHTML = filtered.map(v=>`
+    <tr class="row-click" onclick="openVehicleDetail('${v.id}')">
+      <td><span class="plate">${escapeHtml(v.plate)}</span></td>
+      <td>${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</td>
+      <td>${FLEET_LABEL[v.fleet] || '—'}</td>
+      <td class="mono">${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</td>
+      <td><span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span></td>
+      <td>${escapeHtml(driverName(v.driverId))}</td>
+      ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteVehicle('${v.id}')">Excluir</button></td>` : ''}
+    </tr>`).join('');
+}
+document.getElementById('vehicleSearch').addEventListener('input', renderVehicles);
+document.getElementById('vehicleFilterStatus').addEventListener('change', renderVehicles);
+document.getElementById('vehicleFilterFleet').addEventListener('change', renderVehicles);
+
+/* ============ FROTAS (visão separada, agrupada) ============ */
+function renderFleetOverview(){
+  const el = document.getElementById('fleetOverview');
+  el.innerHTML = FLEET_KEYS.map(key=>{
+    const items = vehicles.filter(v=>v.fleet===key);
+    return `
+    <div class="fleet-col">
+      <div class="fleet-col-head">
+        <span>${FLEET_LABEL[key]}</span>
+        <span class="fleet-count">${items.length}</span>
+      </div>
+      ${items.length ? items.map(v=>`
+        <div class="fleet-veh-row" onclick="openVehicleDetail('${v.id}')">
+          <span class="plate">${escapeHtml(v.plate)}</span>
+          <span class="fleet-veh-model">${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</span>
+          <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
+        </div>`).join('') : '<div class="empty-state" style="padding:20px 8px;"><div class="ic">🚐</div>Nenhum veículo nesta frota.</div>'}
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('btnNewVehicle').addEventListener('click', ()=>openVehicleModal(null));
+function openVehicleModal(id){
+  const v = id ? vehicles.find(x=>x.id===id) : null;
+  document.getElementById('vehicleModalTitle').textContent = v ? 'Editar veículo' : 'Novo veículo';
+  document.getElementById('vhId').value = id || '';
+  document.getElementById('vhPlate').value = v?.plate || '';
+  document.getElementById('vhBrand').value = v?.brand || '';
+  document.getElementById('vhModel').value = v?.model || '';
+  document.getElementById('vhYear').value = v?.year || '';
+  document.getElementById('vhKm').value = v?.km || '';
+  document.getElementById('vhFleet').value = v?.fleet || 'LUMAR';
+  document.getElementById('vhStatus').value = v?.status || 'disponivel';
+  document.getElementById('vhDriver').value = v?.driverId || '';
+  document.getElementById('vhCostCenter').value = v?.costCenter || '';
+  document.getElementById('vhPhoto').value = '';
+  openModal('modalVehicle');
+}
+window.openVehicleModal = openVehicleModal;
+
+function openVehicleDetail(id){
+  const v = vehicles.find(x=>x.id===id);
+  if(!v) return;
+  document.getElementById('vdTitle').textContent = `${v.plate} — ${(v.brand?v.brand+' ':'')+(v.model||'')}`;
+  document.getElementById('vdPhotoWrap').innerHTML = v.photoURL
+    ? `<img src="${v.photoURL}" style="max-width:100%; border-radius:10px; border:1px solid var(--border);">`
+    : `<div class="empty-state" style="padding:28px 20px;"><div class="ic">📷</div>Nenhuma foto cadastrada. Clique em "Editar veículo" para adicionar uma.</div>`;
+  document.getElementById('vdMeta').innerHTML = `
+    <span class="plate">${escapeHtml(v.plate)}</span>
+    <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
+    <span style="font-size:12px; color:var(--ink-muted);">${FLEET_LABEL[v.fleet] || 'Sem frota definida'}</span>
+  `;
+  document.getElementById('vdInfoGrid').innerHTML = `
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Ano</div>${v.year || '—'}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Motorista</div>${v.driverId ? `<span class="row-click" style="cursor:pointer; text-decoration:underline;" onclick="closeModal('modalVehicleDetail'); openDriverDetail('${v.driverId}')">${escapeHtml(driverName(v.driverId))}</span>` : '—'}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Centro de custo</div>${escapeHtml(v.costCenter||'—')}</div>
+  `;
+  const swaps = vehicleSwaps.filter(s=>s.fromVehicleId===id || s.toVehicleId===id).sort((a,b)=>b.createdAt-a.createdAt);
+  document.getElementById('vdSwapHistoryWrap').innerHTML = swaps.length ? `
+    <h4 style="font-size:13px; margin-bottom:8px;">Histórico de trocas</h4>
+    <ul class="timeline">
+      ${swaps.map(s=>`<li><div class="dot"></div><div><div>${escapeHtml(s.fromPlate)} → ${escapeHtml(s.toPlate)} · motivo: ${escapeHtml(s.reason)}${s.driverId ? ' · condutor: '+escapeHtml(driverName(s.driverId)) : ''}</div>
+      <div class="meta">${fmtDate(s.createdAt)}</div></div></li>`).join('')}
+    </ul>` : '';
+  const isAdmin = currentUser.role === 'admin';
+  document.getElementById('vdFoot').innerHTML = `
+    ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm" id="vdDeleteBtn">Excluir</button>` : ''}
+    <button type="button" class="btn btn-ghost btn-sm" id="vdSwapBtn">🔄 Trocar veículo</button>
+    <button type="button" class="btn btn-ghost btn-sm" data-close="modalVehicleDetail">Fechar</button>
+    <button type="button" class="btn btn-primary btn-sm" id="vdEditBtn">Editar veículo</button>
+  `;
+  document.getElementById('vdFoot').querySelector('[data-close]').addEventListener('click', ()=>closeModal('modalVehicleDetail'));
+  document.getElementById('vdEditBtn').onclick = ()=>{ closeModal('modalVehicleDetail'); openVehicleModal(id); };
+  document.getElementById('vdSwapBtn').onclick = ()=>{ closeModal('modalVehicleDetail'); openVehicleSwapModal(id); };
+  if(isAdmin){
+    document.getElementById('vdDeleteBtn').onclick = ()=>{ closeModal('modalVehicleDetail'); deleteVehicle(id); };
+  }
+  openModal('modalVehicleDetail');
+}
+window.openVehicleDetail = openVehicleDetail;
+
+document.getElementById('btnSaveVehicle').addEventListener('click', async ()=>{
+  const id = document.getElementById('vhId').value;
+  const plate = document.getElementById('vhPlate').value.trim().toUpperCase();
+  const model = document.getElementById('vhModel').value.trim();
+  if(!plate || !model){ toast('Placa e modelo são obrigatórios.', 'err'); return; }
+  const payload = {
+    plate, model,
+    brand: document.getElementById('vhBrand').value.trim(),
+    year: Number(document.getElementById('vhYear').value) || null,
+    km: Number(document.getElementById('vhKm').value) || 0,
+    fleet: document.getElementById('vhFleet').value,
+    status: document.getElementById('vhStatus').value,
+    driverId: document.getElementById('vhDriver').value || null,
+    costCenter: document.getElementById('vhCostCenter').value.trim(),
+  };
+  const file = document.getElementById('vhPhoto').files[0];
+  if(file) payload.photoURL = await processPhoto(file, 'veiculos');
+  try {
+    if(id){
+      await updateDoc(doc(db,'vehicles',id), payload);
+    } else {
+      payload.photoURL = payload.photoURL || vehiclePlaceholderPhoto(payload);
+      await addDoc(collection(db,'vehicles'), payload);
+    }
+    toast('Veículo salvo.', 'ok');
+    closeModal('modalVehicle');
+  } catch(err){
+    toast('Erro ao salvar veículo: '+err.message, 'err');
+  }
+});
+
+async function deleteVehicle(id){
+  const v = vehicles.find(x=>x.id===id);
+  if(!v) return;
+  if(!confirm(`Excluir o veículo ${v.plate}? Esta ação não pode ser desfeita.`)) return;
+  try {
+    await deleteDoc(doc(db,'vehicles',id));
+    toast('Veículo excluído.', 'ok');
+  } catch(err){
+    toast('Erro ao excluir veículo: '+err.message, 'err');
+  }
+}
+window.deleteVehicle = deleteVehicle;
+
+/* ============ MOTORISTAS ============ */
+function renderDrivers(){
+  const search = document.getElementById('driverSearch').value.toLowerCase();
+  const statusFilter = document.getElementById('driverFilterStatus').value;
+  const isAdmin = currentUser.role === 'admin';
+  const filtered = drivers.filter(d =>
+    (!statusFilter || d.status===statusFilter) &&
+    (!search || (d.name||'').toLowerCase().includes(search) || (d.cnh||'').toLowerCase().includes(search))
+  );
+  document.getElementById('driverCountDesc').textContent = `${drivers.length} motorista(s) cadastrado(s)`;
+  document.getElementById('driversEmpty').classList.toggle('hidden', filtered.length>0);
+  document.getElementById('driversTbody').innerHTML = filtered.map(d=>{
+    const vehicle = vehicles.find(v=>v.driverId===d.id);
+    const expired = isCnhExpired(d);
+    return `
+    <tr class="row-click" onclick="openDriverDetail('${d.id}')">
+      <td>${escapeHtml(d.name)}</td>
+      <td class="mono">${escapeHtml(d.cnh||'—')}</td>
+      <td>${escapeHtml(d.cnhCategory||'—')}</td>
+      <td>${d.cnhValidity ? new Date(d.cnhValidity+'T00:00:00').toLocaleDateString('pt-BR') : '—'}${expired ? ' <span class="badge badge-sinistrado">Vencida</span>' : ''}</td>
+      <td>${escapeHtml(d.phone||'—')}</td>
+      <td>${vehicle ? `<span class="plate">${escapeHtml(vehicle.plate)}</span>` : '—'}</td>
+      <td><span class="badge badge-${d.status==='ativo'?'disponivel':'reserva'}">${d.status==='ativo'?'Ativo':'Inativo'}</span></td>
+      ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteDriver('${d.id}')">Excluir</button></td>` : ''}
+    </tr>`;
+  }).join('');
+}
+document.getElementById('driverSearch').addEventListener('input', renderDrivers);
+document.getElementById('driverFilterStatus').addEventListener('change', renderDrivers);
+
+document.getElementById('btnNewDriver').addEventListener('click', ()=>openDriverModal(null));
+function openDriverModal(id){
+  const d = id ? drivers.find(x=>x.id===id) : null;
+  document.getElementById('driverModalTitle').textContent = d ? 'Editar motorista' : 'Novo motorista';
+  document.getElementById('drvId').value = id || '';
+  document.getElementById('drvName').value = d?.name || '';
+  document.getElementById('drvCnh').value = d?.cnh || '';
+  document.getElementById('drvCnhCategory').value = d?.cnhCategory || 'B';
+  document.getElementById('drvCnhValidity').value = d?.cnhValidity || '';
+  document.getElementById('drvPhone').value = d?.phone || '';
+  document.getElementById('drvStatus').value = d?.status || 'ativo';
+  openModal('modalDriver');
+}
+window.openDriverModal = openDriverModal;
+
+document.getElementById('btnSaveDriver').addEventListener('click', async ()=>{
+  const id = document.getElementById('drvId').value;
+  const name = document.getElementById('drvName').value.trim();
+  if(!name){ toast('Nome é obrigatório.', 'err'); return; }
+  const payload = {
+    name,
+    cnh: document.getElementById('drvCnh').value.trim(),
+    cnhCategory: document.getElementById('drvCnhCategory').value,
+    cnhValidity: document.getElementById('drvCnhValidity').value,
+    phone: document.getElementById('drvPhone').value.trim(),
+    status: document.getElementById('drvStatus').value,
+  };
+  try {
+    if(id){
+      await updateDoc(doc(db,'drivers',id), payload);
+    } else {
+      await addDoc(collection(db,'drivers'), payload);
+    }
+    toast('Motorista salvo.', 'ok');
+    closeModal('modalDriver');
+  } catch(err){
+    toast('Erro ao salvar motorista: '+err.message, 'err');
+  }
+});
+
+async function deleteDriver(id){
+  const d = drivers.find(x=>x.id===id);
+  if(!d) return;
+  if(!confirm(`Excluir o motorista ${d.name}? Esta ação não pode ser desfeita.`)) return;
+  try {
+    const batch = writeBatch(db);
+    batch.delete(doc(db,'drivers',id));
+    vehicles.filter(v=>v.driverId===id).forEach(v=>batch.update(doc(db,'vehicles',v.id), {driverId:null}));
+    await batch.commit();
+    toast('Motorista excluído.', 'ok');
+  } catch(err){
+    toast('Erro ao excluir motorista: '+err.message, 'err');
+  }
+}
+window.deleteDriver = deleteDriver;
+
+function openDriverDetail(id){
+  const d = drivers.find(x=>x.id===id);
+  if(!d) return;
+  const vehicle = vehicles.find(v=>v.driverId===d.id);
+  const expired = isCnhExpired(d);
+  document.getElementById('ddTitle').textContent = d.name;
+  document.getElementById('ddMeta').innerHTML = `
+    <span class="badge badge-${d.status==='ativo'?'disponivel':'reserva'}">${d.status==='ativo'?'Ativo':'Inativo'}</span>
+    ${expired ? '<span class="badge badge-sinistrado">CNH vencida</span>' : ''}
+    ${vehicle ? `<span class="plate" style="cursor:pointer;" onclick="closeModal('modalDriverDetail'); openVehicleDetail('${vehicle.id}')">${escapeHtml(vehicle.plate)}</span>` : '<span style="font-size:12px; color:var(--ink-muted);">Sem veículo atribuído</span>'}
+  `;
+  document.getElementById('ddInfoGrid').innerHTML = `
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">CNH</div>${escapeHtml(d.cnh||'—')}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Categoria</div>${escapeHtml(d.cnhCategory||'—')}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Validade da CNH</div>${d.cnhValidity ? new Date(d.cnhValidity+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Telefone</div>${escapeHtml(d.phone||'—')}</div>
+  `;
+
+  const driverInspections = inspections.filter(i=>i.driverId===d.id).sort((a,b)=>b.createdAt-a.createdAt);
+  document.getElementById('ddInspections').innerHTML = driverInspections.length ? `<table><tbody>${driverInspections.map(i=>`
+    <tr class="row-click" onclick="closeModal('modalDriverDetail'); openInspectionDetail('${i.id}')">
+      <td>${fmtDate(i.createdAt)}</td>
+      <td><span class="plate">${escapeHtml(i.vehiclePlate)}</span></td>
+      <td><span class="result-pill res-${i.result}">${RESULT_LABEL[i.result]}</span></td>
+    </tr>`).join('')}</tbody></table>` : '<div style="font-size:12.5px; color:var(--ink-faint);">Nenhuma vistoria registrada por este motorista.</div>';
+
+  const driverSwaps = vehicleSwaps.filter(s=>s.driverId===d.id).sort((a,b)=>b.createdAt-a.createdAt);
+  document.getElementById('ddSwaps').innerHTML = driverSwaps.length ? `
+    <ul class="timeline">
+      ${driverSwaps.map(s=>`<li><div class="dot"></div><div><div>${escapeHtml(s.fromPlate)} → ${escapeHtml(s.toPlate)} · motivo: ${escapeHtml(s.reason)}</div>
+      <div class="meta">${fmtDate(s.createdAt)}</div></div></li>`).join('')}
+    </ul>` : '<div style="font-size:12.5px; color:var(--ink-faint);">Nenhuma troca de veículo registrada.</div>';
+
+  const isAdmin = currentUser.role === 'admin';
+  document.getElementById('ddFoot').innerHTML = `
+    ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm" id="ddDeleteBtn">Excluir</button>` : ''}
+    <button type="button" class="btn btn-ghost btn-sm" data-close="modalDriverDetail">Fechar</button>
+    <button type="button" class="btn btn-primary btn-sm" id="ddEditBtn">Editar motorista</button>
+  `;
+  document.getElementById('ddFoot').querySelector('[data-close]').addEventListener('click', ()=>closeModal('modalDriverDetail'));
+  document.getElementById('ddEditBtn').onclick = ()=>{ closeModal('modalDriverDetail'); openDriverModal(id); };
+  if(isAdmin){
+    document.getElementById('ddDeleteBtn').onclick = ()=>{ closeModal('modalDriverDetail'); deleteDriver(id); };
+  }
+  openModal('modalDriverDetail');
+}
+window.openDriverDetail = openDriverDetail;
+
+/* ============ TROCA DE VEÍCULO ============ */
+function vehicleSwapOptionLabel(v){
+  const who = v.driverId ? ` · condutor: ${driverName(v.driverId)}` : '';
+  return `${v.plate} — ${(v.brand?v.brand+' ':'')+(v.model||'')} (${VEHICLE_STATUS_LABEL[v.status]||v.status})${who}`;
+}
+
+function refreshSwapToOptions(){
+  const fromId = document.getElementById('vsFromVehicle').value;
+  document.getElementById('vsToVehicle').innerHTML = vehicles.filter(x=>x.id!==fromId)
+    .map(x=>`<option value="${x.id}">${escapeHtml(vehicleSwapOptionLabel(x))}</option>`).join('');
+  const fromVehicle = vehicles.find(x=>x.id===fromId);
+  document.getElementById('vsDriverId').value = fromVehicle?.driverId || '';
+}
+document.getElementById('vsFromVehicle').addEventListener('change', refreshSwapToOptions);
+
+function openVehicleSwapModal(id){
+  document.getElementById('vsFromVehicle').innerHTML = vehicles
+    .map(x=>`<option value="${x.id}">${escapeHtml(vehicleSwapOptionLabel(x))}</option>`).join('');
+  document.getElementById('vsFromVehicle').value = id || vehicles[0]?.id || '';
+  document.getElementById('vsReason').value = 'Manutenção';
+  document.getElementById('vsObservations').value = '';
+  refreshSwapToOptions();
+  openModal('modalVehicleSwap');
+}
+window.openVehicleSwapModal = openVehicleSwapModal;
+document.getElementById('btnSwapVehicle').addEventListener('click', ()=>openVehicleSwapModal());
+
+document.getElementById('btnSaveVehicleSwap').addEventListener('click', async ()=>{
+  const fromId = document.getElementById('vsFromVehicle').value;
+  const toId = document.getElementById('vsToVehicle').value;
+  if(!toId){ toast('Selecione o veículo substituto.', 'err'); return; }
+  const fromVehicle = vehicles.find(v=>v.id===fromId);
+  const toVehicle = vehicles.find(v=>v.id===toId);
+  if(!fromVehicle || !toVehicle) return;
+  const reason = document.getElementById('vsReason').value;
+  const driverId = document.getElementById('vsDriverId').value || null;
+  const observations = document.getElementById('vsObservations').value.trim();
+
+  try {
+    const batch = writeBatch(db);
+    batch.set(doc(collection(db,'vehicleSwaps')), {
+      fromVehicleId: fromId, fromPlate: fromVehicle.plate,
+      toVehicleId: toId, toPlate: toVehicle.plate,
+      reason, driverId, observations, createdBy: currentUser.name, createdAt: Date.now()
+    });
+    batch.update(doc(db,'vehicles',fromId), {
+      status: reason==='Manutenção' ? 'em-manutencao' : (reason==='Sinistro' ? 'sinistrado' : 'reserva'),
+      driverId: null,
+    });
+    batch.update(doc(db,'vehicles',toId), {
+      status: 'em-uso',
+      driverId: driverId || toVehicle.driverId || null,
+    });
+    await batch.commit();
+    toast(`Troca registrada: ${fromVehicle.plate} → ${toVehicle.plate}.`, 'ok');
+    closeModal('modalVehicleSwap');
+  } catch(err){
+    toast('Erro ao registrar troca: '+err.message, 'err');
+  }
+});
+
+/* ============ VISTORIAS ============ */
+function toDatetimeLocal(date){
+  const pad = n=>String(n).padStart(2,'0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function renderInspectionChecklistForm(){
+  document.getElementById('inspChecklist').innerHTML = CHECKLIST_ITEMS.map(item=>`
+    <div class="chk-row">
+      <div class="chk-label">${escapeHtml(item.label)}</div>
+      <select class="chk-select" id="chk_${item.key}">
+        <option value="ok">OK</option>
+        <option value="problema">Problema</option>
+        <option value="na">N/A</option>
+      </select>
+      <input type="text" class="chk-obs hidden" id="chkobs_${item.key}" placeholder="Descreva o problema encontrado…">
+    </div>`).join('');
+  CHECKLIST_ITEMS.forEach(item=>{
+    document.getElementById('chk_'+item.key).addEventListener('change', (e)=>{
+      document.getElementById('chkobs_'+item.key).classList.toggle('hidden', e.target.value!=='problema');
+    });
+  });
+}
+
+function renderInspections(){
+  const search = document.getElementById('inspectionSearch').value.toLowerCase();
+  const resultFilter = document.getElementById('inspectionFilterResult').value;
+  const isAdmin = currentUser.role === 'admin';
+  const sorted = [...inspections].sort((a,b)=>b.createdAt-a.createdAt);
+  const filtered = sorted.filter(i =>
+    (!resultFilter || i.result===resultFilter) &&
+    (!search || (i.vehiclePlate||'').toLowerCase().includes(search) || driverName(i.driverId).toLowerCase().includes(search))
+  );
+  document.getElementById('inspectionCountDesc').textContent = `${inspections.length} vistoria(s) registrada(s)`;
+  document.getElementById('inspectionsEmpty').classList.toggle('hidden', filtered.length>0);
+  document.getElementById('inspectionsTbody').innerHTML = filtered.map(i=>`
+    <tr class="row-click" onclick="openInspectionDetail('${i.id}')">
+      <td>${fmtDate(i.createdAt)}</td>
+      <td><span class="plate">${escapeHtml(i.vehiclePlate)}</span></td>
+      <td>${escapeHtml(driverName(i.driverId))}</td>
+      <td class="mono">${Number(i.km).toLocaleString('pt-BR')}</td>
+      <td><span class="result-pill res-${i.result}">${RESULT_LABEL[i.result]}</span></td>
+      ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteInspection('${i.id}')">Excluir</button></td>` : ''}
+    </tr>`).join('');
+}
+document.getElementById('inspectionSearch').addEventListener('input', renderInspections);
+document.getElementById('inspectionFilterResult').addEventListener('change', renderInspections);
+
+document.getElementById('btnNewInspection').addEventListener('click', ()=>{
+  document.getElementById('inspVehicle').value = vehicles[0]?.id || '';
+  document.getElementById('inspDriverId').value = '';
+  document.getElementById('inspDate').value = toDatetimeLocal(new Date());
+  document.getElementById('inspKm').value = '';
+  CHECKLIST_ITEMS.forEach(item=>{
+    document.getElementById('chk_'+item.key).value = 'ok';
+    const obs = document.getElementById('chkobs_'+item.key);
+    obs.value = '';
+    obs.classList.add('hidden');
+  });
+  ['inspPhotoFrente','inspPhotoTraseira','inspPhotoLatEsq','inspPhotoLatDir','inspPhotoPainel','inspExtraPhotos'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('inspRetido').checked = false;
+  document.getElementById('inspAutoTicket').checked = true;
+  document.getElementById('inspObservations').value = '';
+  openModal('modalInspection');
+});
+
+document.getElementById('btnSaveInspection').addEventListener('click', async ()=>{
+  const vehicleId = document.getElementById('inspVehicle').value;
+  const driverId = document.getElementById('inspDriverId').value;
+  const kmRaw = document.getElementById('inspKm').value;
+  if(!vehicleId || !driverId || !kmRaw){ toast('Selecione o veículo, o condutor e informe a quilometragem.', 'err'); return; }
+  const vehicle = vehicles.find(v=>v.id===vehicleId);
+  const km = Number(kmRaw);
+  const dateVal = document.getElementById('inspDate').value;
+  const performedAt = dateVal ? new Date(dateVal).getTime() : Date.now();
+  const retido = document.getElementById('inspRetido').checked;
+  const autoTicket = document.getElementById('inspAutoTicket').checked;
+  const observations = document.getElementById('inspObservations').value.trim();
+
+  const checklist = [];
+  let hasProblem = false;
+  CHECKLIST_ITEMS.forEach(item=>{
+    const status = document.getElementById('chk_'+item.key).value;
+    const obs = document.getElementById('chkobs_'+item.key).value.trim();
+    if(status==='problema') hasProblem = true;
+    checklist.push({...item, status, obs});
+  });
+  let result = 'APROVADO';
+  if(retido) result = 'REPROVADO';
+  else if(hasProblem) result = 'RESSALVAS';
+
+  const inspDriverLabel = driverName(driverId);
+  const inspSubfolder = driveVehicleFolder('VISTORIAS', vehicle?.plate, inspDriverLabel);
+
+  const photoSlotIds = {frente:'inspPhotoFrente', traseira:'inspPhotoTraseira', lateralEsq:'inspPhotoLatEsq', lateralDir:'inspPhotoLatDir', painel:'inspPhotoPainel'};
+  const photos = {};
+  for(const [key, id] of Object.entries(photoSlotIds)){
+    const file = document.getElementById(id).files[0];
+    if(file) photos[key] = await processPhoto(file, inspSubfolder);
+  }
+  const extraFiles = Array.from(document.getElementById('inspExtraPhotos').files || []);
+  const extraPhotos = await Promise.all(extraFiles.map(f=>processPhoto(f, inspSubfolder)));
+
+  const inspTextFileId = await uploadTextToDrive(
+    `VISTORIA — ${vehicle?.plate||'—'}\n\n` +
+    `Veículo: ${vehicle?.plate||'—'} — ${(vehicle?.brand?vehicle.brand+' ':'')+(vehicle?.model||'')}\n` +
+    `Motorista/condutor: ${inspDriverLabel}\n` +
+    `KM na vistoria: ${km}\n` +
+    `Resultado: ${RESULT_LABEL[result]}\n` +
+    `Realizada por: ${currentUser.name}\n` +
+    `Data: ${fmtDate(performedAt)}\n\n` +
+    `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
+    `Observações gerais:\n${observations || '—'}\n`,
+    `${new Date(performedAt).toISOString().slice(0,10)}_vistoria.txt`, inspSubfolder
+  );
+
+  const inspectionRef = doc(collection(db,'inspections'));
+  const generatedTickets = [];
+  const batch = writeBatch(db);
+  let ticketSeq = tickets.length;
+
+  if(autoTicket){
+    checklist.forEach(entry=>{
+      if(entry.status==='problema' && entry.category){
+        ticketSeq++;
+        const ticketNumber = `FRT-${new Date().getFullYear()}-${String(ticketSeq).padStart(6,'0')}`;
+        batch.set(doc(collection(db,'tickets')), {
+          ticketNumber, vehicleId, vehiclePlate: vehicle?.plate || '—',
+          description: `Item reprovado na vistoria de ${fmtDate(performedAt)}, condutor ${driverName(driverId)}: ${entry.label}.${entry.obs ? ' Obs.: '+entry.obs : ''}`,
+          priority: retido ? 'CRITICA' : 'ALTA', status:'NOVO', km, location:'', parado:retido, photoURL:null,
+          openedByUid: currentUser.uid, openedByName: currentUser.name,
+          createdAt:Date.now(), updatedAt:Date.now(), fromInspectionId: inspectionRef.id
+        });
+        generatedTickets.push(ticketNumber);
+      }
+    });
+  }
+
+  batch.set(inspectionRef, {
+    vehicleId, vehiclePlate: vehicle?.plate || '—',
+    driverId, km, retido, result, observations,
+    checklist, photos, extraPhotos, driveTextFileId: inspTextFileId,
+    createdBy: currentUser.name, createdAt: performedAt,
+    generatedTickets
+  });
+
+  if(result==='REPROVADO' && vehicle && vehicle.status!=='em-manutencao'){
+    batch.update(doc(db,'vehicles',vehicleId), {status:'em-manutencao'});
+  }
+
+  try {
+    await batch.commit();
+    toast(`Vistoria registrada — resultado: ${RESULT_LABEL[result]}.` + (generatedTickets.length ? ` ${generatedTickets.length} O.S. gerada(s) automaticamente.` : ''), result==='REPROVADO' ? 'err' : 'ok');
+    closeModal('modalInspection');
+  } catch(err){
+    toast('Erro ao salvar vistoria: '+err.message, 'err');
+  }
+});
+
+async function deleteInspection(id){
+  const i = inspections.find(x=>x.id===id);
+  if(!i) return;
+  if(!confirm(`Excluir a vistoria de ${i.vehiclePlate} em ${fmtDate(i.createdAt)}? Esta ação não pode ser desfeita — as fotos também saem do Drive.`)) return;
+  try {
+    await deleteDoc(doc(db,'inspections',id));
+    deleteDriveFiles([...Object.values(i.photos||{}), ...(i.extraPhotos||[]), i.driveTextFileId]);
+    toast('Vistoria excluída.', 'ok');
+  } catch(err){
+    toast('Erro ao excluir vistoria: '+err.message, 'err');
+  }
+}
+window.deleteInspection = deleteInspection;
+
+function openInspectionDetail(id){
+  const i = inspections.find(x=>x.id===id);
+  if(!i) return;
+  document.getElementById('idTitle').textContent = `Vistoria — ${i.vehiclePlate}`;
+  document.getElementById('idMeta').innerHTML = `
+    <span class="plate">${escapeHtml(i.vehiclePlate)}</span>
+    <span class="result-pill res-${i.result}">${RESULT_LABEL[i.result]}</span>
+    <span style="font-size:12px; color:var(--ink-muted);">condutor ${escapeHtml(driverName(i.driverId))} · ${fmtDate(i.createdAt)} · KM ${Number(i.km).toLocaleString('pt-BR')}</span>
+  `;
+  document.getElementById('idChecklist').innerHTML = i.checklist.map(c=>`
+    <div class="chk-row">
+      <div class="chk-label">${escapeHtml(c.label)}</div>
+      <span class="badge badge-${c.status==='ok'?'disponivel':c.status==='problema'?'sinistrado':'reserva'}">${CHECKLIST_STATUS_LABEL[c.status]}</span>
+      ${c.obs ? `<div class="chk-obs" style="border:none; background:none; padding:0; color:var(--ink-muted); font-size:12.5px;">${escapeHtml(c.obs)}</div>` : ''}
+    </div>`).join('');
+  const photoEntries = [];
+  Object.entries(i.photos||{}).forEach(([key,src])=>photoEntries.push({label:PHOTO_SLOT_LABEL[key]||key, src}));
+  (i.extraPhotos||[]).forEach((src,idx)=>photoEntries.push({label:'Avaria/Extra '+(idx+1), src}));
+  document.getElementById('idPhotos').innerHTML = photoEntries.length
+    ? photoEntries.map(p=>`<img src="${p.src}" title="${escapeHtml(p.label)}" onclick="window.open('${p.src}','_blank')">`).join('')
+    : '<div style="font-size:12.5px; color:var(--ink-faint);">Nenhuma foto anexada.</div>';
+  document.getElementById('idObservations').textContent = i.observations || 'Sem observações.';
+  document.getElementById('idGeneratedTickets').innerHTML = (i.generatedTickets||[]).length
+    ? `<h4 style="font-size:13px; margin-bottom:8px;">O.S. geradas automaticamente</h4><div style="display:flex; gap:8px; flex-wrap:wrap;">${i.generatedTickets.map(tn=>`<span class="ticket-tag"><span class="bar" style="background:var(--brand)"></span><span class="num">${escapeHtml(tn)}</span></span>`).join('')}</div>`
+    : '';
+  openModal('modalInspectionDetail');
+}
+window.openInspectionDetail = openInspectionDetail;
+
+/* ============ TICKETS (ORDENS DE SERVIÇO) ============ */
+function ticketTagHtml(t){
+  const color = `var(--st-${t.priority.toLowerCase()})`;
+  return `<span class="ticket-tag"><span class="bar" style="background:${color}"></span><span class="num">${escapeHtml(t.ticketNumber||'—')}</span></span>`;
+}
+
+function renderTickets(){
+  const statusFilter = document.getElementById('ticketFilterStatus').value;
+  const priorityFilter = document.getElementById('ticketFilterPriority').value;
+  const isAdmin = currentUser.role === 'admin';
+  const sorted = [...tickets].sort((a,b)=>b.createdAt-a.createdAt);
+  const filtered = sorted.filter(t=>{
+    if(priorityFilter && t.priority!==priorityFilter) return false;
+    if(statusFilter && t.status!==statusFilter) return false;
+    return true;
+  });
+  document.getElementById('ticketCountDesc').textContent = `${tickets.length} O.S. registrada(s)`;
+  document.getElementById('ticketsEmpty').classList.toggle('hidden', filtered.length>0);
+  document.getElementById('ticketsTbody').innerHTML = filtered.map(t=>`
+    <tr class="row-click" onclick="openTicketDetail('${t.id}')">
+      <td>${ticketTagHtml(t)}</td>
+      <td><span class="plate">${escapeHtml(t.vehiclePlate||'—')}</span></td>
+      <td><span class="pri-tag pri-${t.priority.toLowerCase()}">${PRIORITY_LABEL[t.priority]}</span></td>
+      <td><span class="status-pill st-${t.status}">${STATUS_LABEL[t.status]}</span></td>
+      <td>${fmtDate(t.createdAt)}</td>
+      ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteTicket('${t.id}')">Excluir</button></td>` : ''}
+    </tr>`).join('');
+}
+document.getElementById('ticketFilterStatus').addEventListener('change', renderTickets);
+document.getElementById('ticketFilterPriority').addEventListener('change', renderTickets);
+
+document.getElementById('btnNewTicket').addEventListener('click', ()=>{
+  document.getElementById('tkVehicle').disabled = false;
+  populateVehicleSelect();
+  document.getElementById('tkVehicle').value = vehicles[0]?.id || '';
+  document.getElementById('tkPriority').value = 'MEDIA';
+  document.getElementById('tkKm').value = '';
+  document.getElementById('tkParado').checked = false;
+  document.getElementById('tkLocation').value = '';
+  document.getElementById('tkDescription').value = '';
+  document.getElementById('tkPhoto').value = '';
+  openModal('modalTicket');
+});
+
+function nextTicketNumber(){
+  return `FRT-${new Date().getFullYear()}-${String(tickets.length+1).padStart(6,'0')}`;
+}
+
+document.getElementById('btnSaveTicket').addEventListener('click', async ()=>{
+  const vehicleId = document.getElementById('tkVehicle').value;
+  const description = document.getElementById('tkDescription').value.trim();
+  if(!vehicleId || !description){ toast('Selecione o veículo e descreva o serviço.', 'err'); return; }
+  const vehicle = vehicles.find(v=>v.id===vehicleId) || myVehicle;
+  const parado = document.getElementById('tkParado').checked;
+  const priority = parado ? 'CRITICA' : document.getElementById('tkPriority').value;
+  const ticketNumber = nextTicketNumber();
+  const location = document.getElementById('tkLocation').value.trim();
+  const km = Number(document.getElementById('tkKm').value) || null;
+  const driverLabel = vehicle?.driverId ? driverName(vehicle.driverId) : 'Sem motorista';
+  const subfolder = driveVehicleFolder('ORDEM DE SERVIÇO', vehicle?.plate, driverLabel);
+  let photoURL = null;
+  const file = document.getElementById('tkPhoto').files[0];
+  if(file) photoURL = await processPhoto(file, subfolder);
+  const driveTextFileId = await uploadTextToDrive(
+    `ORDEM DE SERVIÇO — ${ticketNumber}\n\n` +
+    `Veículo: ${vehicle?.plate||'—'} — ${(vehicle?.brand?vehicle.brand+' ':'')+(vehicle?.model||'')}\n` +
+    `Motorista: ${driverLabel}\n` +
+    `Prioridade: ${PRIORITY_LABEL[priority]}\n` +
+    `Localização: ${location||'—'}\n` +
+    `KM no momento: ${km||'—'}\n` +
+    `Aberto por: ${currentUser.name}\n` +
+    `Data de abertura: ${fmtDate(Date.now())}\n\n` +
+    `Descrição do serviço solicitado:\n${description}\n`,
+    `${ticketNumber}_solicitacao.txt`, subfolder
+  );
+  try {
+    await addDoc(collection(db,'tickets'), {
+      ticketNumber, vehicleId, vehiclePlate: vehicle?.plate || '—',
+      description, priority, status:'NOVO',
+      km, location,
+      parado, photoURL, driveTextFileId,
+      openedByUid: currentUser.uid, openedByName: currentUser.name,
+      createdAt: Date.now(), updatedAt: Date.now()
+    });
+    toast(`O.S. ${ticketNumber} aberta.`, 'ok');
+    closeModal('modalTicket');
+  } catch(err){
+    toast('Erro ao abrir O.S.: '+err.message, 'err');
+  }
+});
+
+async function deleteTicket(id){
+  const t = tickets.find(x=>x.id===id);
+  if(!t) return;
+  if(!confirm(`Excluir a O.S. ${t.ticketNumber}? Esta ação não pode ser desfeita — as fotos também saem do Drive.`)) return;
+  try {
+    await deleteDoc(doc(db,'tickets',id));
+    deleteDriveFiles([t.photoURL, ...(t.closingPhotos||[]), t.driveTextFileId, t.closingTextFileId]);
+    toast('O.S. excluída.', 'ok');
+  } catch(err){
+    toast('Erro ao excluir O.S.: '+err.message, 'err');
+  }
+}
+window.deleteTicket = deleteTicket;
+
+/* ---- ticket detail ---- */
+function openTicketDetail(id){
+  const t = tickets.find(x=>x.id===id);
+  if(!t) return;
+  document.getElementById('tdTitle').textContent = t.ticketNumber;
+  document.getElementById('tdMeta').innerHTML = `
+    <span class="plate">${escapeHtml(t.vehiclePlate)}</span>
+    <span class="pri-tag pri-${t.priority.toLowerCase()}">${PRIORITY_LABEL[t.priority]}</span>
+    <span class="status-pill st-${t.status}">${STATUS_LABEL[t.status]}</span>
+    <span style="font-size:12px; color:var(--ink-muted);">aberto por ${escapeHtml(t.openedByName||'—')} em ${fmtDate(t.createdAt)}</span>
+  `;
+  document.getElementById('tdPhotoWrap').innerHTML = t.photoURL
+    ? `<img src="${t.photoURL}" style="max-width:100%; border-radius:10px; border:1px solid var(--border);">` : '';
+
+  document.getElementById('tdReportGrid').innerHTML = `
+    <div class="report-box">
+      <div class="report-box-head">📋 Descrição do serviço</div>
+      <div class="report-box-body">${escapeHtml(t.description)}</div>
+    </div>
+    <div class="report-box">
+      <div class="report-box-head">🔧 Serviço executado</div>
+      <div class="report-box-body">${t.status==='CONCLUIDO' ? escapeHtml(t.closingDescription||'—') : '<span style="color:var(--ink-faint);">A O.S. ainda está aberta.</span>'}</div>
+      ${t.status==='CONCLUIDO' && (t.closingPhotos||[]).length ? `<div class="photo-gallery" style="margin-top:10px;">${t.closingPhotos.map(p=>`<img src="${p}" onclick="window.open('${p}','_blank')">`).join('')}</div>` : ''}
+    </div>
+  `;
+
+  const actionsEl = document.getElementById('tdStatusActions');
+  const printBtn = `<button type="button" class="btn btn-ghost btn-sm" id="btnPrintTicket">🖨 Imprimir</button>`;
+  if(t.status!=='CONCLUIDO'){
+    const options = OPEN_STATUS_KEYS.concat('CONCLUIDO').map(k=>`<option value="${k}" ${k===t.status?'selected':''}>${STATUS_LABEL[k]}</option>`).join('');
+    actionsEl.innerHTML = `
+      <label style="font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted);">Status</label>
+      <select id="tdStatusSelect" class="chk-select">${options}</select>
+      ${printBtn}
+    `;
+    document.getElementById('tdStatusSelect').addEventListener('change', async (e)=>{
+      const newStatus = e.target.value;
+      if(newStatus==='CONCLUIDO'){
+        e.target.value = t.status;
+        openTicketCloseModal(id);
+        return;
+      }
+      try {
+        await updateDoc(doc(db,'tickets',id), {status:newStatus, updatedAt: Date.now()});
+        toast(`Status atualizado para "${STATUS_LABEL[newStatus]}".`, 'ok');
+        openTicketDetail(id);
+      } catch(err){
+        toast('Erro ao atualizar status: '+err.message, 'err');
+      }
+    });
+  } else {
+    actionsEl.innerHTML = `<span style="font-size:12.5px; color:var(--st-concluido); font-weight:600;">✓ O.S. concluída em ${fmtDate(t.closedAt)}</span>${printBtn}`;
+  }
+  document.getElementById('btnPrintTicket').onclick = ()=>printTicket(t);
+
+  openModal('modalTicketDetail');
+}
+window.openTicketDetail = openTicketDetail;
+
+function openTicketCloseModal(id){
+  const t = tickets.find(x=>x.id===id);
+  if(!t) return;
+  document.getElementById('tcOriginalDescription').textContent = t.description;
+  document.getElementById('tcDescription').value = '';
+  document.getElementById('tcPhotos').value = '';
+  document.getElementById('modalTicketClose').dataset.ticketId = id;
+  openModal('modalTicketClose');
+}
+window.openTicketCloseModal = openTicketCloseModal;
+
+document.getElementById('btnConfirmCloseTicket').addEventListener('click', async ()=>{
+  const id = document.getElementById('modalTicketClose').dataset.ticketId;
+  const t = tickets.find(x=>x.id===id);
+  if(!t) return;
+  const closingDescription = document.getElementById('tcDescription').value.trim();
+  if(!closingDescription){ toast('Descreva o serviço executado.', 'err'); return; }
+  const closeVehicle = vehicles.find(v=>v.id===t.vehicleId);
+  const closeDriverLabel = closeVehicle?.driverId ? driverName(closeVehicle.driverId) : 'Sem motorista';
+  const closeSubfolder = driveVehicleFolder('ORDEM DE SERVIÇO', t.vehiclePlate, closeDriverLabel);
+  const files = Array.from(document.getElementById('tcPhotos').files || []);
+  const closingPhotos = await Promise.all(files.map(f=>processPhoto(f, closeSubfolder)));
+  const closingTextFileId = await uploadTextToDrive(
+    `ORDEM DE SERVIÇO — ${t.ticketNumber} (fechamento)\n\n` +
+    `Veículo: ${t.vehiclePlate||'—'}\n` +
+    `Motorista: ${closeDriverLabel}\n` +
+    `Fechada por: ${currentUser.name}\n` +
+    `Data de fechamento: ${fmtDate(Date.now())}\n\n` +
+    `Serviço executado:\n${closingDescription}\n`,
+    `${t.ticketNumber}_fechamento.txt`, closeSubfolder
+  );
+
+  try {
+    await updateDoc(doc(db,'tickets',id), {
+      status: 'CONCLUIDO',
+      closingDescription,
+      closingPhotos,
+      closingTextFileId,
+      closedBy: currentUser.name,
+      closedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+    toast(`O.S. ${t.ticketNumber} fechada.`, 'ok');
+    closeModal('modalTicketClose');
+    openTicketDetail(id);
+  } catch(err){
+    toast('Erro ao fechar O.S.: '+err.message, 'err');
+  }
+});
+
+function printTicket(t){
+  const closingHtml = t.status==='CONCLUIDO' ? `
+    <h3>Serviço executado</h3>
+    <p>${escapeHtml(t.closingDescription||'—')}</p>
+    ${(t.closingPhotos||[]).length ? `<div class="print-photos">${t.closingPhotos.map(p=>`<img src="${p}">`).join('')}</div>` : ''}
+    <p style="margin-top:10px;"><strong>Fechada em:</strong> ${fmtDate(t.closedAt)} por ${escapeHtml(t.closedBy||'—')}</p>
+  ` : '';
+  document.getElementById('printArea').innerHTML = `
+    <h1>Ordem de Serviço ${escapeHtml(t.ticketNumber)}</h1>
+    <p><strong>Veículo:</strong> ${escapeHtml(t.vehiclePlate)} &nbsp; <strong>Prioridade:</strong> ${PRIORITY_LABEL[t.priority]} &nbsp; <strong>Status:</strong> ${STATUS_LABEL[t.status]}</p>
+    <p><strong>Aberta em:</strong> ${fmtDate(t.createdAt)} por ${escapeHtml(t.openedByName||'—')}</p>
+    <h3>Descrição do serviço</h3>
+    <p>${escapeHtml(t.description)}</p>
+    ${closingHtml}
+  `;
+  window.print();
+}
+
+/* ============ ADMIN ============ */
+function populateAdminDriverSelect(){
+  const sel = document.getElementById('admDriverId');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">Selecione…</option>' + drivers.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
+}
+document.getElementById('admRole').addEventListener('change', (e)=>{
+  document.getElementById('admDriverField').classList.toggle('hidden', e.target.value!=='motorista');
+});
+function clearUserRoleForm(){
+  document.getElementById('admUid').value = '';
+  document.getElementById('admName').value = '';
+  document.getElementById('admEmail').value = '';
+  document.getElementById('admRole').value = 'admin';
+  document.getElementById('admDriverField').classList.add('hidden');
+  document.getElementById('admDriverId').value = '';
+}
+document.getElementById('btnClearUserRoleForm').addEventListener('click', clearUserRoleForm);
+document.getElementById('btnSaveUserRole').addEventListener('click', async ()=>{
+  const uidVal = document.getElementById('admUid').value.trim();
+  const name = document.getElementById('admName').value.trim();
+  const email = document.getElementById('admEmail').value.trim();
+  const role = document.getElementById('admRole').value;
+  const driverId = role==='motorista' ? (document.getElementById('admDriverId').value || null) : null;
+  if(!uidVal || !name){ toast('Informe o UID e o nome.', 'err'); return; }
+  if(role==='motorista' && !driverId){ toast('Selecione a qual motorista esse login pertence.', 'err'); return; }
+  try {
+    await setDoc(doc(db,'roles',uidVal), {name, email, role, driverId}, {merge:true});
+    toast('Perfil salvo.', 'ok');
+    clearUserRoleForm();
+  } catch(err){
+    toast('Erro ao salvar perfil: '+err.message, 'err');
+  }
+});
+
+function renderRolesTable(){
+  const tbody = document.getElementById('rolesTbody');
+  if(!tbody) return;
+  document.getElementById('rolesEmpty').classList.toggle('hidden', allRoles.length>0);
+  tbody.innerHTML = allRoles.map(r=>{
+    const driver = drivers.find(d=>d.id===r.driverId);
+    const pwLabel = r.passwordChanged ? `Sim${r.passwordChangedAt ? ' — '+fmtDate(r.passwordChangedAt) : ''}` : 'Não';
+    return `<tr>
+      <td>${escapeHtml(r.name||'—')}</td>
+      <td class="mono">${escapeHtml(r.email||'—')}</td>
+      <td>${ROLE_LABEL[r.role]||r.role||'—'}</td>
+      <td>${driver ? escapeHtml(driver.name) : '—'}</td>
+      <td>${pwLabel}</td>
+      <td>
+        <button type="button" class="btn btn-ghost btn-xs" onclick="editRole('${r.id}')">Editar</button>
+        <button type="button" class="btn btn-danger btn-xs" onclick="deleteRole('${r.id}')">Excluir</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function editRole(id){
+  const r = allRoles.find(x=>x.id===id);
+  if(!r) return;
+  document.getElementById('admUid').value = id;
+  document.getElementById('admName').value = r.name || '';
+  document.getElementById('admEmail').value = r.email || '';
+  document.getElementById('admRole').value = r.role || 'admin';
+  document.getElementById('admDriverField').classList.toggle('hidden', r.role!=='motorista');
+  document.getElementById('admDriverId').value = r.driverId || '';
+}
+window.editRole = editRole;
+
+async function deleteRole(id){
+  if(!confirm('Remover o perfil deste usuário? Isso NÃO exclui a conta de login no Firebase Authentication, só o acesso dele dentro do app.')) return;
+  try {
+    await deleteDoc(doc(db,'roles',id));
+    toast('Perfil removido.', 'ok');
+  } catch(err){
+    toast('Erro ao remover perfil: '+err.message, 'err');
+  }
+}
+window.deleteRole = deleteRole;
+
+/* ============ HELPERS ============ */
+function fileToDataURL(file){
+  return new Promise((res, rej)=>{
+    const r = new FileReader();
+    r.onload = ()=>res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+// Redimensiona/comprime a foto antes de guardar (o Firestore tem limite de ~1MB por documento;
+// isso deixa de ser necessário assim que o upload direto pro Drive estiver plugado).
+function compressImageFile(file, maxDim=1280, quality=0.7){
+  return new Promise(async (res, rej)=>{
+    try {
+      const dataUrl = await fileToDataURL(file);
+      const img = new Image();
+      img.onload = ()=>{
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width*scale);
+          height = Math.round(height*scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        res(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = ()=>res(dataUrl);
+      img.src = dataUrl;
+    } catch(err){ rej(err); }
+  });
+}
+
+// Web App do Apps Script que salva a foto na pasta do Google Drive (ver apps-script-drive-upload.gs)
+const DRIVE_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzzVidDesLkDZpWSj2p2uO6ptAElAbpyXVPrVEgU0KkplntwCKZ99W5afrmAeKHnnFB/exec';
+
+async function uploadPhotoToDrive(dataUrl, filename, subfolder){
+  try {
+    const res = await fetch(DRIVE_UPLOAD_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'}, // evita preflight CORS no Apps Script
+      body: JSON.stringify({ base64: dataUrl, filename, mimeType: 'image/jpeg', subfolder }),
+    });
+    const json = await res.json();
+    if(json && json.ok) return json.directUrl || json.url;
+    throw new Error((json && json.error) || 'Falha desconhecida no upload.');
+  } catch(err){
+    console.error('Erro ao enviar foto pro Drive:', err);
+    return null;
+  }
+}
+
+// Comprime a foto e tenta subir pro Drive; se falhar (sem internet, script fora do ar etc.),
+// cai de volta pra guardar a foto comprimida direto no Firestore, pra nunca perder o registro.
+async function processPhoto(file, subfolder){
+  const compressed = await compressImageFile(file);
+  const filename = `${Date.now()}_${(file.name||'foto').replace(/[^\w.\-]+/g,'_')}.jpg`;
+  const driveUrl = await uploadPhotoToDrive(compressed, filename, subfolder);
+  if(!driveUrl) toast('Não consegui enviar a foto pro Drive agora — ela foi salva no sistema mesmo assim.', '');
+  return driveUrl || compressed;
+}
+
+// Monta o caminho de pasta "BASE/PLACA - MOTORISTA", sem barras que quebrariam os subníveis.
+function driveVehicleFolder(baseFolder, plate, driverLabel){
+  const clean = s => String(s||'').replace(/[\\/]+/g,'-').trim();
+  const safePlate = clean(plate) || 'SEM-PLACA';
+  const safeDriver = clean(driverLabel) || 'Sem motorista';
+  return `${baseFolder}/${safePlate} - ${safeDriver}`;
+}
+
+function textToBase64(text){
+  return btoa(unescape(encodeURIComponent(text)));
+}
+
+async function uploadTextToDrive(text, filename, subfolder){
+  try {
+    const res = await fetch(DRIVE_UPLOAD_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({ base64: textToBase64(text), filename, mimeType: 'text/plain', subfolder }),
+    });
+    const json = await res.json();
+    if(!(json && json.ok)){ console.error('Falha ao subir txt pro Drive:', json && json.error); return null; }
+    return json.fileId || null;
+  } catch(err){
+    console.error('Erro ao enviar txt pro Drive:', err);
+    return null;
+  }
+}
+
+// Extrai o fileId de uma URL tipo https://drive.google.com/uc?id=FILEID
+function extractDriveFileId(url){
+  if(!url || typeof url !== 'string') return null;
+  const m = url.match(/[?&]id=([^&]+)/);
+  return m ? m[1] : null;
+}
+
+// Manda pra lixeira do Drive os arquivos ligados a uma O.S./vistoria (fotos + o .txt).
+// Falha silenciosa (só loga no console) — nunca deve travar a exclusão do registro no Firestore.
+async function deleteDriveFiles(fileIdsOrUrls){
+  // ignora valores que não parecem um ID de arquivo do Drive (ex.: base64 salvo localmente
+  // quando o upload pro Drive falhou na hora de criar o registro).
+  const looksLikeId = v => typeof v === 'string' && /^[a-zA-Z0-9_-]{10,80}$/.test(v);
+  const ids = (fileIdsOrUrls||[]).map(v => extractDriveFileId(v) || v).filter(looksLikeId);
+  if(!ids.length) return;
+  try {
+    await fetch(DRIVE_UPLOAD_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action:'delete', fileIds: ids }),
+    });
+  } catch(err){
+    console.error('Erro ao excluir arquivos do Drive:', err);
+  }
+}
+
+function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
+document.querySelectorAll('[data-close]').forEach(btn=>{
+  btn.addEventListener('click', ()=>closeModal(btn.dataset.close));
+});
+document.querySelectorAll('.modal-backdrop').forEach(bd=>{
+  bd.addEventListener('click', (e)=>{ if(e.target===bd) bd.classList.add('hidden'); });
+});
+function escapeHtml(str){
+  if(str===undefined || str===null) return '';
+  return String(str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+</body>
+</html>
