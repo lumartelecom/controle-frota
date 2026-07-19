@@ -370,6 +370,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
       <button class="sb-item staff-only-nav" data-view="trocas"><span class="ic">🔄</span><span class="sb-label">Trocas</span></button>
       <button class="sb-item hidden" data-view="meucarro" id="navInicio"><span class="ic">🏠</span><span class="sb-label">Início</span></button>
       <button class="sb-item hidden" data-view="meuveiculo" id="navMeuVeiculo"><span class="ic">🚐</span><span class="sb-label">Meu Veículo</span></button>
+      <button class="sb-item hidden" data-view="minhastrocas" id="navMinhasTrocas"><span class="ic">🔄</span><span class="sb-label">Histórico de Trocas</span></button>
       <button class="sb-item hidden" data-view="admin" id="navAdmin"><span class="ic">⚙</span><span class="sb-label">Administração</span></button>
     </nav>
     <div class="sb-foot">
@@ -447,6 +448,23 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
           </div>
         </div>
         <div id="meuVeiculoContent"></div>
+      </section>
+
+      <!-- HISTÓRICO DE TROCAS (motorista) -->
+      <section id="view-minhastrocas" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>Histórico de Trocas</h2>
+            <div class="desc">Suas solicitações de troca de veículo</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="overflow-x:auto;"><table>
+            <thead><tr><th>Data</th><th>De</th><th>Para</th><th>Motivo</th><th>Status</th></tr></thead>
+            <tbody id="minhasTrocasTbody"></tbody>
+          </table></div>
+          <div id="minhasTrocasEmpty" class="empty-state hidden"><div class="ic">🔄</div>Nenhuma solicitação de troca ainda.</div>
+        </div>
       </section>
 
       <!-- VEHICLES -->
@@ -1316,8 +1334,8 @@ function greetingWord(){
 function vehicleDisplayPhoto(v, inspList){
   if(!v) return null;
   const withPhoto = (inspList||[]).filter(i=>i.photos && i.photos.frente).sort((a,b)=>b.createdAt-a.createdAt);
-  if(withPhoto.length) return withPhoto[0].photos.frente;
-  return v.photoURL || vehiclePlaceholderPhoto(v);
+  if(withPhoto.length) return driveViewableUrl(withPhoto[0].photos.frente);
+  return driveViewableUrl(v.photoURL) || vehiclePlaceholderPhoto(v);
 }
 
 /* ============ AUTENTICAÇÃO ============ */
@@ -1389,6 +1407,7 @@ function boot(){
   document.querySelectorAll('.staff-only-nav').forEach(el=>el.classList.toggle('hidden', isMotorista));
   document.getElementById('navInicio').classList.toggle('hidden', !isMotorista);
   document.getElementById('navMeuVeiculo').classList.toggle('hidden', !isMotorista);
+  document.getElementById('navMinhasTrocas').classList.toggle('hidden', !isMotorista);
   document.querySelectorAll('.admin-only-col').forEach(el=>el.classList.toggle('hidden', !isAdmin));
 
   // motorista: sidebar vira um drawer que só aparece ao tocar no ☰, pra deixar a tela inicial limpa
@@ -1485,6 +1504,7 @@ function attachMotoristaListeners(){
   const unsubS = onSnapshot(sq, ssnap=>{
     mySwapRequests = ssnap.docs.map(d=>({id:d.id, ...d.data()}));
     renderMeuCarro();
+    renderMinhasTrocas();
   }, err=>toast('Erro lendo solicitações de troca: '+err.message, 'err'));
   unsubscribers.push(unsubS);
 
@@ -1533,10 +1553,10 @@ document.querySelectorAll('.sb-item[data-view]').forEach(btn=>{
 });
 function switchView(view, filter){
   document.querySelectorAll('.sb-item[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
-  ['dashboard','vehicles','drivers','inspections','tickets','trocas','admin','meucarro','meuveiculo'].forEach(v=>{
+  ['dashboard','vehicles','drivers','inspections','tickets','trocas','admin','meucarro','meuveiculo','minhastrocas'].forEach(v=>{
     document.getElementById('view-'+v).classList.toggle('hidden', v!==view);
   });
-  const titles = {dashboard:'Dashboard', vehicles:'Veículos', drivers:'Motoristas', inspections:'Vistorias de Veículos', tickets:'Ordens de Serviço', trocas:'Trocas de Veículo', admin:'Administração', meucarro:'Início', meuveiculo:'Meu Veículo'};
+  const titles = {dashboard:'Dashboard', vehicles:'Veículos', drivers:'Motoristas', inspections:'Vistorias de Veículos', tickets:'Ordens de Serviço', trocas:'Trocas de Veículo', admin:'Administração', meucarro:'Início', meuveiculo:'Meu Veículo', minhastrocas:'Histórico de Trocas'};
   document.getElementById('viewTitle').textContent = titles[view];
 
   if(view==='vehicles'){
@@ -1565,6 +1585,9 @@ function switchView(view, filter){
   }
   if(view==='meuveiculo'){
     renderMeuVeiculo();
+  }
+  if(view==='minhastrocas'){
+    renderMinhasTrocas();
   }
 }
 window.switchView = switchView;
@@ -1670,6 +1693,21 @@ function renderMeuVeiculo(){
   `;
 }
 
+function renderMinhasTrocas(){
+  const tbody = document.getElementById('minhasTrocasTbody');
+  if(!tbody) return;
+  const sorted = [...mySwapRequests].sort((a,b)=>b.createdAt-a.createdAt);
+  document.getElementById('minhasTrocasEmpty').classList.toggle('hidden', sorted.length>0);
+  tbody.innerHTML = sorted.map(s=>`
+    <tr class="row-click" onclick="openSwapProgressModal('${s.id}')">
+      <td>${fmtDate(s.createdAt)}</td>
+      <td><span class="plate">${escapeHtml(s.fromPlate)}</span></td>
+      <td><span class="plate">${escapeHtml(s.toPlate)}</span></td>
+      <td>${escapeHtml(s.reason||'—')}</td>
+      <td><span class="badge badge-${s.status==='APROVADA'?'disponivel':s.status==='REPROVADA'?'sinistrado':'reserva'}">${SWAP_STATUS_LABEL[s.status]||s.status}</span></td>
+    </tr>`).join('');
+}
+
 /* ============ SOLICITAÇÃO DE TROCA DE VEÍCULO (motorista) ============ */
 const SWAP_ACTIVE_STATUSES = ['VISTORIA_PENDENTE','AGUARDANDO_APROVACAO','AJUSTES'];
 function getActiveSwapRequest(){
@@ -1708,6 +1746,7 @@ document.getElementById('btnSaveSwapRequest').addEventListener('click', async ()
     closeModal('modalSwapRequest');
     mySwapRequests.push({id:ref.id, driverId:currentUser.driverId, fromVehicleId:myVehicle.id, fromPlate:myVehicle.plate, toVehicleId:toId, toPlate:toVehicle?.plate||'—', reason, observations, status:'VISTORIA_PENDENTE', returnInspectionId:null, receiveInspectionId:null, createdAt:Date.now()});
     renderMeuCarro();
+    renderMinhasTrocas();
     openSwapProgressModal(ref.id);
   } catch(err){
     toast('Erro ao criar solicitação: '+err.message, 'err');
@@ -1822,6 +1861,7 @@ document.getElementById('btnSaveSwapInspection').addEventListener('click', async
     });
     if(s){ s[field] = inspRef.id; s.status = bothDone ? 'AGUARDANDO_APROVACAO' : 'VISTORIA_PENDENTE'; }
     renderMeuCarro();
+    renderMinhasTrocas();
     toast('Vistoria registrada.' + (bothDone ? ' Solicitação enviada para aprovação.' : ' Falta a vistoria do outro veículo.'), 'ok');
     closeModal('modalSwapInspection');
     currentSwapLeg = null;
@@ -1870,7 +1910,7 @@ function inspectionSummaryHtml(insp){
       ${c.obs ? `<div class="chk-obs" style="border:none; background:none; padding:0; color:var(--ink-muted); font-size:12.5px;">${escapeHtml(c.obs)}</div>` : ''}
     </div>`).join('');
   const photoEntries = [];
-  Object.entries(insp.photos||{}).forEach(([key,src])=>photoEntries.push({label:PHOTO_SLOT_LABEL[key]||key, src}));
+  Object.entries(insp.photos||{}).forEach(([key,src])=>photoEntries.push({label:PHOTO_SLOT_LABEL[key]||key, src:driveViewableUrl(src)}));
   const photosHtml = photoEntries.length
     ? `<div class="photo-gallery" style="margin-top:10px;">${photoEntries.map(p=>`<img src="${p.src}" title="${escapeHtml(p.label)}" onclick="window.open('${p.src}','_blank')">`).join('')}</div>`
     : '<div style="font-size:12.5px; color:var(--ink-faint); margin-top:8px;">Nenhuma foto anexada.</div>';
@@ -2255,7 +2295,7 @@ function openVehicleDetail(id){
   if(!v) return;
   document.getElementById('vdTitle').textContent = `${v.plate} — ${(v.brand?v.brand+' ':'')+(v.model||'')}`;
   document.getElementById('vdPhotoWrap').innerHTML = v.photoURL
-    ? `<img src="${v.photoURL}" style="max-width:100%; border-radius:10px; border:1px solid var(--border);">`
+    ? `<img src="${driveViewableUrl(v.photoURL)}" style="max-width:100%; border-radius:10px; border:1px solid var(--border);">`
     : `<div class="empty-state" style="padding:28px 20px;"><div class="ic">📷</div>Nenhuma foto cadastrada. Clique em "Editar veículo" para adicionar uma.</div>`;
   document.getElementById('vdMeta').innerHTML = `
     <span class="plate">${escapeHtml(v.plate)}</span>
@@ -2758,8 +2798,8 @@ function openInspectionDetail(id){
       ${c.obs ? `<div class="chk-obs" style="border:none; background:none; padding:0; color:var(--ink-muted); font-size:12.5px;">${escapeHtml(c.obs)}</div>` : ''}
     </div>`).join('');
   const photoEntries = [];
-  Object.entries(i.photos||{}).forEach(([key,src])=>photoEntries.push({label:PHOTO_SLOT_LABEL[key]||key, src}));
-  (i.extraPhotos||[]).forEach((src,idx)=>photoEntries.push({label:'Avaria/Extra '+(idx+1), src}));
+  Object.entries(i.photos||{}).forEach(([key,src])=>photoEntries.push({label:PHOTO_SLOT_LABEL[key]||key, src:driveViewableUrl(src)}));
+  (i.extraPhotos||[]).forEach((src,idx)=>photoEntries.push({label:'Avaria/Extra '+(idx+1), src:driveViewableUrl(src)}));
   document.getElementById('idPhotos').innerHTML = photoEntries.length
     ? photoEntries.map(p=>`<img src="${p.src}" title="${escapeHtml(p.label)}" onclick="window.open('${p.src}','_blank')">`).join('')
     : '<div style="font-size:12.5px; color:var(--ink-faint);">Nenhuma foto anexada.</div>';
@@ -2906,7 +2946,7 @@ function openTicketDetail(id){
     <span style="font-size:12px; color:var(--ink-muted);">aberto por ${escapeHtml(t.openedByName||'—')} em ${fmtDate(t.createdAt)}</span>
   `;
   document.getElementById('tdPhotoWrap').innerHTML = t.photoURL
-    ? `<img src="${t.photoURL}" style="max-width:100%; border-radius:10px; border:1px solid var(--border);">` : '';
+    ? `<img src="${driveViewableUrl(t.photoURL)}" style="max-width:100%; border-radius:10px; border:1px solid var(--border);">` : '';
 
   document.getElementById('tdReportGrid').innerHTML = `
     <div class="report-box">
@@ -2916,7 +2956,7 @@ function openTicketDetail(id){
     <div class="report-box">
       <div class="report-box-head">🔧 Serviço executado</div>
       <div class="report-box-body">${t.status==='CONCLUIDO' ? escapeHtml(t.closingDescription||'—') : '<span style="color:var(--ink-faint);">A O.S. ainda está aberta.</span>'}</div>
-      ${t.status==='CONCLUIDO' && (t.closingPhotos||[]).length ? `<div class="photo-gallery" style="margin-top:10px;">${t.closingPhotos.map(p=>`<img src="${p}" onclick="window.open('${p}','_blank')">`).join('')}</div>` : ''}
+      ${t.status==='CONCLUIDO' && (t.closingPhotos||[]).length ? `<div class="photo-gallery" style="margin-top:10px;">${t.closingPhotos.map(p=>`<img src="${driveViewableUrl(p)}" onclick="window.open('${driveViewableUrl(p)}','_blank')">`).join('')}</div>` : ''}
     </div>
   `;
 
@@ -3011,7 +3051,7 @@ function printTicket(t){
   const closingHtml = t.status==='CONCLUIDO' ? `
     <h3>Serviço executado</h3>
     <p>${escapeHtml(t.closingDescription||'—')}</p>
-    ${(t.closingPhotos||[]).length ? `<div class="print-photos">${t.closingPhotos.map(p=>`<img src="${p}">`).join('')}</div>` : ''}
+    ${(t.closingPhotos||[]).length ? `<div class="print-photos">${t.closingPhotos.map(p=>`<img src="${driveViewableUrl(p)}">`).join('')}</div>` : ''}
     <p style="margin-top:10px;"><strong>Fechada em:</strong> ${fmtDate(t.closedAt)} por ${escapeHtml(t.closedBy||'—')}</p>
   ` : '';
   document.getElementById('printArea').innerHTML = `
@@ -3279,6 +3319,16 @@ async function processPhoto(file, subfolder){
 }
 
 // Monta o caminho de pasta "BASE/PLACA - MOTORISTA", sem barras que quebrariam os subníveis.
+// Fotos antigas foram salvas como "drive.google.com/uc?id=..." — esse formato às vezes
+// não carrega como <img> embutida (fica com o ícone de imagem quebrada). Reescreve pra
+// "thumbnail?id=...&sz=w2000", que é o formato confiável do Google pra isso. Não mexe
+// em URLs que já vieram certas nem em fotos guardadas direto como base64.
+function driveViewableUrl(url){
+  if(!url || typeof url !== 'string') return url;
+  const m = url.match(/drive\.google\.com\/uc\?(?:export=\w+&)?id=([^&]+)/);
+  return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w2000` : url;
+}
+
 function driveVehicleFolder(baseFolder, plate, driverLabel){
   const clean = s => String(s||'').replace(/[\\/]+/g,'-').trim();
   const safePlate = clean(plate) || 'SEM-PLACA';
