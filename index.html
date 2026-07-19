@@ -300,7 +300,9 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
   aspect-ratio:16/9; border-radius:12px; border:1px solid var(--border); background:var(--surface-alt);
   overflow:hidden; box-shadow:var(--shadow-sm);
 }
-.vehicle-photo-frame img{width:100%; height:100%; object-fit:cover; display:block;}
+.vehicle-photo-frame img{width:100%; height:100%; object-fit:cover; object-position:center; display:block;}
+/* foto em pé (retrato): cover cortaria demais o carro nas laterais — mostra ela inteira, centralizada */
+.vehicle-photo-frame img.portrait{object-fit:contain;}
 .vehicle-photo-frame .photo-placeholder{
   width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
   gap:8px; color:var(--ink-faint);
@@ -383,6 +385,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
       <button class="sb-item staff-only-nav" data-view="trocas"><span class="ic">🔄</span><span class="sb-label">Trocas</span></button>
       <button class="sb-item hidden" data-view="meucarro" id="navInicio"><span class="ic">🏠</span><span class="sb-label">Início</span></button>
       <button class="sb-item hidden" data-view="meuveiculo" id="navMeuVeiculo"><span class="ic">🚐</span><span class="sb-label">Meu Veículo</span></button>
+      <button class="sb-item hidden" data-view="minhasos" id="navMinhasOS"><span class="ic">🛠</span><span class="sb-label">O.S. em Aberto</span></button>
       <button class="sb-item hidden" data-view="minhastrocas" id="navMinhasTrocas"><span class="ic">🔄</span><span class="sb-label">Histórico de Trocas</span></button>
       <button class="sb-item hidden" data-view="admin" id="navAdmin"><span class="ic">⚙</span><span class="sb-label">Administração</span></button>
     </nav>
@@ -461,6 +464,23 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
           </div>
         </div>
         <div id="meuVeiculoContent"></div>
+      </section>
+
+      <!-- O.S. EM ABERTO (motorista) -->
+      <section id="view-minhasos" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>O.S. em Aberto</h2>
+            <div class="desc">Ordens de serviço abertas para o seu veículo</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="overflow-x:auto;"><table>
+            <thead><tr><th>O.S.</th><th>Prioridade</th><th>Status</th><th>Aberto em</th></tr></thead>
+            <tbody id="minhasOSTbody"></tbody>
+          </table></div>
+          <div id="minhasOSEmpty" class="empty-state hidden"><div class="ic">🛠</div>Nenhuma O.S. em aberto.</div>
+        </div>
       </section>
 
       <!-- HISTÓRICO DE TROCAS (motorista) -->
@@ -772,7 +792,9 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
   <div class="modal-box">
     <div class="modal-head"><h3 id="vdTitle">Veículo</h3><button class="modal-close" data-close="modalVehicleDetail">×</button></div>
     <div class="modal-body">
-      <div id="vdPhotoWrap" style="margin-bottom:14px;"></div>
+      <div id="vdPhotoWrap" style="margin-bottom:8px;"></div>
+      <div id="vdPhotoActions" class="hidden" style="display:flex; justify-content:center; margin-bottom:14px;"></div>
+      <input type="file" id="vdPhotoFileInput" accept="image/*" class="hidden">
       <div id="vdMeta" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center;"></div>
       <div id="vdInfoGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13.5px; margin-bottom:16px;"></div>
       <div id="vdSwapHistoryWrap"></div>
@@ -1355,8 +1377,9 @@ function vehicleDisplayPhoto(v, inspList){
 // Monta a moldura padrão (proporção fixa, cantos arredondados, borda) usada em toda
 // tela que mostra a foto do veículo — com placeholder elegante quando não há foto.
 function vehiclePhotoFrameHtml(photoUrl){
+  // Foto em pé (retrato) rende melhor inteira e centralizada do que cortada nas laterais.
   return `<div class="vehicle-photo-frame">${photoUrl
-    ? `<img src="${photoUrl}">`
+    ? `<img src="${photoUrl}" onload="if(this.naturalHeight>this.naturalWidth) this.classList.add('portrait');">`
     : `<div class="photo-placeholder"><div class="ic">🚐</div><span>Sem foto cadastrada</span></div>`}</div>`;
 }
 
@@ -1429,6 +1452,7 @@ function boot(){
   document.querySelectorAll('.staff-only-nav').forEach(el=>el.classList.toggle('hidden', isMotorista));
   document.getElementById('navInicio').classList.toggle('hidden', !isMotorista);
   document.getElementById('navMeuVeiculo').classList.toggle('hidden', !isMotorista);
+  document.getElementById('navMinhasOS').classList.toggle('hidden', !isMotorista);
   document.getElementById('navMinhasTrocas').classList.toggle('hidden', !isMotorista);
   document.querySelectorAll('.admin-only-col').forEach(el=>el.classList.toggle('hidden', !isAdmin));
 
@@ -1519,7 +1543,7 @@ function attachMotoristaListeners(){
   renderChecklistInto('swInspChecklist', 'sw');
   if(!currentUser.driverId){
     myVehicle = null; myTickets = [];
-    renderMeuCarro();
+    renderMeuCarro(); renderMinhasOS();
     return;
   }
   const sq = query(collection(db,'swapRequests'), where('driverId','==', currentUser.driverId));
@@ -1544,7 +1568,7 @@ function attachMotoristaListeners(){
       const tq = query(collection(db,'tickets'), where('vehicleId','==', myVehicle.id));
       const unsubT = onSnapshot(tq, tsnap=>{
         myTickets = tsnap.docs.map(d=>({id:d.id, ...d.data()}));
-        renderMeuCarro(); renderMeuVeiculo();
+        renderMeuCarro(); renderMeuVeiculo(); renderMinhasOS();
       }, err=>toast('Erro lendo suas O.S.: '+err.message, 'err'));
       unsubscribers.push(unsubT);
 
@@ -1556,7 +1580,7 @@ function attachMotoristaListeners(){
       unsubscribers.push(unsubI);
     } else {
       myTickets = []; myInspections = [];
-      renderMeuCarro(); renderMeuVeiculo();
+      renderMeuCarro(); renderMeuVeiculo(); renderMinhasOS();
     }
   }, err=>toast('Erro lendo seu veículo: '+err.message, 'err'));
   unsubscribers.push(unsubV);
@@ -1575,10 +1599,10 @@ document.querySelectorAll('.sb-item[data-view]').forEach(btn=>{
 });
 function switchView(view, filter){
   document.querySelectorAll('.sb-item[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
-  ['dashboard','vehicles','drivers','inspections','tickets','trocas','admin','meucarro','meuveiculo','minhastrocas'].forEach(v=>{
+  ['dashboard','vehicles','drivers','inspections','tickets','trocas','admin','meucarro','meuveiculo','minhasos','minhastrocas'].forEach(v=>{
     document.getElementById('view-'+v).classList.toggle('hidden', v!==view);
   });
-  const titles = {dashboard:'Dashboard', vehicles:'Veículos', drivers:'Motoristas', inspections:'Vistorias de Veículos', tickets:'Ordens de Serviço', trocas:'Trocas de Veículo', admin:'Administração', meucarro:'Início', meuveiculo:'Meu Veículo', minhastrocas:'Histórico de Trocas'};
+  const titles = {dashboard:'Dashboard', vehicles:'Veículos', drivers:'Motoristas', inspections:'Vistorias de Veículos', tickets:'Ordens de Serviço', trocas:'Trocas de Veículo', admin:'Administração', meucarro:'Início', meuveiculo:'Meu Veículo', minhasos:'O.S. em Aberto', minhastrocas:'Histórico de Trocas'};
   document.getElementById('viewTitle').textContent = titles[view];
 
   if(view==='vehicles'){
@@ -1608,6 +1632,9 @@ function switchView(view, filter){
   if(view==='meuveiculo'){
     renderMeuVeiculo();
   }
+  if(view==='minhasos'){
+    renderMinhasOS();
+  }
   if(view==='minhastrocas'){
     renderMinhasTrocas();
   }
@@ -1627,11 +1654,10 @@ function renderMeuCarro(){
     return;
   }
   const photo = vehicleDisplayPhoto(v, myInspections);
-  const openTix = [...myTickets].filter(t=>t.status!=='CONCLUIDO').sort((a,b)=>b.createdAt-a.createdAt);
   const activeSwap = getActiveSwapRequest();
   wrap.innerHTML = `
     <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
-    <div class="panel" style="margin-bottom:20px;">
+    <div class="panel">
       <div style="padding:16px 16px 0;">${vehiclePhotoFrameHtml(photo)}</div>
       <div style="padding:18px 20px;">
         <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:8px;">
@@ -1647,20 +1673,6 @@ function renderMeuCarro(){
         </div>
       </div>
     </div>
-    <div class="panel">
-      <div class="panel-head"><h3>O.S. em aberto</h3></div>
-      <div style="overflow-x:auto;"><table>
-        <thead><tr><th>O.S.</th><th>Prioridade</th><th>Status</th><th>Aberto em</th></tr></thead>
-        <tbody>${openTix.length ? openTix.map(t=>`
-          <tr class="row-click" onclick="openTicketDetail('${t.id}')">
-            <td class="mono">${escapeHtml(t.ticketNumber)}</td>
-            <td><span class="pri-tag pri-${(t.priority||'').toLowerCase()}">${PRIORITY_LABEL[t.priority]||t.priority}</span></td>
-            <td><span class="status-pill st-${t.status}">${STATUS_LABEL[t.status]||t.status}</span></td>
-            <td>${fmtDate(t.createdAt)}</td>
-          </tr>`).join('') : `<tr><td colspan="4" style="text-align:center; color:var(--ink-muted); padding:24px;">Nenhuma O.S. em aberto.</td></tr>`}
-        </tbody>
-      </table></div>
-    </div>
   `;
   document.getElementById('btnMeuCarroAbrirOS').addEventListener('click', openTicketModalForMyVehicle);
   document.getElementById('btnSolicitarTroca').addEventListener('click', ()=>{
@@ -1668,6 +1680,20 @@ function renderMeuCarro(){
     if(active) openSwapProgressModal(active.id);
     else openSwapRequestModal();
   });
+}
+
+function renderMinhasOS(){
+  const tbody = document.getElementById('minhasOSTbody');
+  if(!tbody) return;
+  const openTix = [...myTickets].filter(t=>t.status!=='CONCLUIDO').sort((a,b)=>b.createdAt-a.createdAt);
+  document.getElementById('minhasOSEmpty').classList.toggle('hidden', openTix.length>0);
+  tbody.innerHTML = openTix.map(t=>`
+    <tr class="row-click" onclick="openTicketDetail('${t.id}')">
+      <td class="mono">${escapeHtml(t.ticketNumber)}</td>
+      <td><span class="pri-tag pri-${(t.priority||'').toLowerCase()}">${PRIORITY_LABEL[t.priority]||t.priority}</span></td>
+      <td><span class="status-pill st-${t.status}">${STATUS_LABEL[t.status]||t.status}</span></td>
+      <td>${fmtDate(t.createdAt)}</td>
+    </tr>`).join('');
 }
 
 function renderMeuVeiculo(){
@@ -2315,13 +2341,31 @@ window.openVehicleModal = openVehicleModal;
 function openVehicleDetail(id){
   const v = vehicles.find(x=>x.id===id);
   if(!v) return;
+  document.getElementById('modalVehicleDetail').dataset.vehicleId = id;
+  const isAdmin = currentUser.role === 'admin';
   document.getElementById('vdTitle').textContent = `${v.plate} — ${(v.brand?v.brand+' ':'')+(v.model||'')}`;
   // Mesma prioridade de foto usada na tela do motorista: vistoria mais recente > foto cadastrada.
   // Assim a foto que o staff vê aqui é sempre a mesma que o motorista vê no app dele.
   const vehicleInspections = inspections.filter(i=>i.vehicleId===id);
   const vdPhoto = vehicleDisplayPhoto(v, vehicleInspections);
-  document.getElementById('vdPhotoWrap').innerHTML = vehiclePhotoFrameHtml(vdPhoto) +
-    (vdPhoto ? '' : '<div style="font-size:12px; color:var(--ink-faint); text-align:center; margin-top:8px;">Clique em "Editar veículo" para adicionar uma foto.</div>');
+  document.getElementById('vdPhotoWrap').innerHTML = vehiclePhotoFrameHtml(vdPhoto);
+  const photoActionsEl = document.getElementById('vdPhotoActions');
+  if(isAdmin){
+    photoActionsEl.classList.remove('hidden');
+    // O botão sempre age sobre a foto cadastrada do veículo (v.photoURL) — a de vistoria
+    // é histórico da inspeção e não se mexe por aqui.
+    photoActionsEl.innerHTML = v.photoURL
+      ? `<button type="button" class="btn btn-danger btn-xs" id="vdBtnRemovePhoto">🗑 Remover foto cadastrada</button>`
+      : `<button type="button" class="btn btn-ghost btn-xs" id="vdBtnAddPhoto">+ Adicionar foto</button>`;
+    if(v.photoURL){
+      document.getElementById('vdBtnRemovePhoto').onclick = ()=>removeVehiclePhoto(id);
+    } else {
+      document.getElementById('vdBtnAddPhoto').onclick = ()=>document.getElementById('vdPhotoFileInput').click();
+    }
+  } else {
+    photoActionsEl.classList.add('hidden');
+    photoActionsEl.innerHTML = '';
+  }
   document.getElementById('vdMeta').innerHTML = `
     <span class="plate">${escapeHtml(v.plate)}</span>
     <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
@@ -2340,7 +2384,6 @@ function openVehicleDetail(id){
       ${swaps.map(s=>`<li><div class="dot"></div><div><div>${escapeHtml(s.fromPlate)} → ${escapeHtml(s.toPlate)} · motivo: ${escapeHtml(s.reason)}${s.driverId ? ' · condutor: '+escapeHtml(driverName(s.driverId)) : ''}</div>
       <div class="meta">${fmtDate(s.createdAt)}</div></div></li>`).join('')}
     </ul>` : '';
-  const isAdmin = currentUser.role === 'admin';
   document.getElementById('vdFoot').innerHTML = `
     ${isAdmin ? `<button type="button" class="btn btn-danger btn-sm" id="vdDeleteBtn">Excluir</button>` : ''}
     <button type="button" class="btn btn-ghost btn-sm" id="vdSwapBtn">🔄 Trocar veículo</button>
@@ -2356,6 +2399,38 @@ function openVehicleDetail(id){
   openModal('modalVehicleDetail');
 }
 window.openVehicleDetail = openVehicleDetail;
+
+async function removeVehiclePhoto(id){
+  const v = vehicles.find(x=>x.id===id);
+  if(!v || !v.photoURL) return;
+  if(!confirm('Remover a foto cadastrada deste veículo?')) return;
+  try {
+    await updateDoc(doc(db,'vehicles',id), {photoURL: null});
+    deleteDriveFiles([v.photoURL]);
+    toast('Foto removida.', 'ok');
+    openVehicleDetail(id);
+  } catch(err){
+    toast('Erro ao remover foto: '+err.message, 'err');
+  }
+}
+
+document.getElementById('vdPhotoFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  const id = document.getElementById('modalVehicleDetail').dataset.vehicleId;
+  if(!file || !id) return;
+  const btn = document.getElementById('vdBtnAddPhoto');
+  if(btn){ btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    const photoURL = await processPhoto(file, 'veiculos');
+    await updateDoc(doc(db,'vehicles',id), {photoURL});
+    toast('Foto adicionada.', 'ok');
+    openVehicleDetail(id);
+  } catch(err){
+    toast('Erro ao adicionar foto: '+err.message, 'err');
+  } finally {
+    e.target.value = '';
+  }
+});
 
 document.getElementById('btnSaveVehicle').addEventListener('click', async ()=>{
   const btn = document.getElementById('btnSaveVehicle');
