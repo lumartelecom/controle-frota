@@ -578,6 +578,27 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
           </div>
           <div id="rolesEmpty" class="empty-state hidden"><div class="ic">👤</div>Nenhum usuário vinculado ainda.</div>
         </div>
+        <div class="panel" style="padding:20px;">
+          <h3 style="font-size:14px; margin-bottom:8px;">Notificações por WhatsApp</h3>
+          <p style="font-size:13px; color:var(--ink-muted); margin-bottom:14px; line-height:1.5;">
+            Quem estiver na lista abaixo recebe um aviso por WhatsApp quando uma O.S. é aberta, e quando uma
+            O.S. fica aberta por muito tempo sem ser concluída. Funciona via <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">CallMeBot</a> —
+            cada pessoa precisa ativar o próprio número mandando a mensagem de ativação pro bot do CallMeBot no WhatsApp
+            e me passar (ou colar aqui) a API key recebida.
+          </p>
+          <div class="form-grid">
+            <div class="field"><label>Nome</label><input id="waName"></div>
+            <div class="field"><label>Telefone (com DDI/DDD)</label><input id="waPhone" placeholder="5586999998888"></div>
+            <div class="field full"><label>API Key (CallMeBot)</label><input id="waApiKey"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btnAddWhatsappRecipient" style="margin-top:12px;">+ Adicionar destinatário</button>
+          <div style="margin-top:16px;" id="whatsappRecipientsList"></div>
+          <div class="field" style="margin-top:18px; max-width:280px;">
+            <label>Avisar quando a O.S. passar de quantas horas sem concluir</label>
+            <input id="waSlowHours" type="number" min="1" value="48">
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btnSaveSlowHours" style="margin-top:10px;">Salvar prazo</button>
+        </div>
       </section>
     </main>
   </div>
@@ -900,7 +921,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
   getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
-  query, where, onSnapshot, writeBatch
+  query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -925,6 +946,9 @@ let vehicleSwaps = [];
 let myVehicle = null;
 let myTickets = [];
 let allRoles = [];
+let whatsappSettings = { recipients: [], slowHours: 48 };
+let ticketsListenerReady = false;
+let slowTicketCheckInterval = null;
 let unsubscribers = [];
 
 const ROLE_LABEL = {admin:'Administrador', supervisor:'Supervisor', mecanico:'Mecânico', motorista:'Motorista'};
@@ -1019,6 +1043,7 @@ document.getElementById('btnLogout').addEventListener('click', ()=>{
 onAuthStateChanged(auth, async (user)=>{
   unsubscribers.forEach(fn=>fn());
   unsubscribers = [];
+  if(slowTicketCheckInterval){ clearInterval(slowTicketCheckInterval); slowTicketCheckInterval = null; }
   if(!user){
     currentUser = null;
     document.getElementById('appShell').classList.add('hidden');
@@ -1094,9 +1119,16 @@ function attachStaffListeners(){
     renderRolesTable();
   }, err=>toast('Erro lendo usuários: '+err.message, 'err')));
 
+  ticketsListenerReady = false;
   unsubscribers.push(onSnapshot(collection(db,'tickets'), snap=>{
+    if(ticketsListenerReady){
+      snap.docChanges().forEach(change=>{
+        if(change.type==='added') notifyNewTicket({id:change.doc.id, ...change.doc.data()});
+      });
+    }
     tickets = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderTickets(); renderDashboard();
+    ticketsListenerReady = true;
   }, err=>toast('Erro lendo O.S.: '+err.message, 'err')));
 
   unsubscribers.push(onSnapshot(collection(db,'inspections'), snap=>{
@@ -1107,6 +1139,15 @@ function attachStaffListeners(){
   unsubscribers.push(onSnapshot(collection(db,'vehicleSwaps'), snap=>{
     vehicleSwaps = snap.docs.map(d=>({id:d.id, ...d.data()}));
   }, err=>toast('Erro lendo trocas: '+err.message, 'err')));
+
+  unsubscribers.push(onSnapshot(doc(db,'settings','whatsapp'), snap=>{
+    whatsappSettings = snap.exists() ? { recipients:[], slowHours:48, ...snap.data() } : { recipients:[], slowHours:48 };
+    renderWhatsappSettings();
+  }, err=>toast('Erro lendo config. WhatsApp: '+err.message, 'err')));
+
+  checkSlowTickets();
+  if(slowTicketCheckInterval) clearInterval(slowTicketCheckInterval);
+  slowTicketCheckInterval = setInterval(checkSlowTickets, 15*60*1000);
 }
 
 function attachMotoristaListeners(){
@@ -2168,6 +2209,102 @@ async function deleteRole(id){
   }
 }
 window.deleteRole = deleteRole;
+
+/* ============ NOTIFICAÇÕES WHATSAPP (CallMeBot) ============ */
+function sendWhatsApp(recipient, text){
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(recipient.phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(recipient.apikey)}`;
+  // no-cors: disparo "e esquece", não precisamos ler a resposta.
+  fetch(url, { mode:'no-cors' }).catch(err=>console.error('Erro ao enviar WhatsApp:', err));
+}
+
+function notifyWhatsApp(text){
+  (whatsappSettings.recipients||[]).forEach(r=>sendWhatsApp(r, text));
+}
+
+function notifyNewTicket(t){
+  if(!(whatsappSettings.recipients||[]).length) return;
+  notifyWhatsApp(
+    `🛠 Nova O.S. aberta\n` +
+    `O.S.: ${t.ticketNumber}\n` +
+    `Veículo: ${t.vehiclePlate||'—'}\n` +
+    `Prioridade: ${PRIORITY_LABEL[t.priority]||t.priority}\n` +
+    `Aberta por: ${t.openedByName||'—'}\n` +
+    `Descrição: ${t.description||'—'}`
+  );
+}
+
+async function checkSlowTickets(){
+  if(!currentUser || currentUser.role==='motorista') return;
+  const recipients = whatsappSettings.recipients||[];
+  if(!recipients.length) return;
+  const slowHours = whatsappSettings.slowHours || 48;
+  const cutoff = Date.now() - slowHours*3600*1000;
+  const slow = tickets.filter(t => t.status!=='CONCLUIDO' && t.createdAt < cutoff && !t.slowNotified);
+  for(const t of slow){
+    notifyWhatsApp(
+      `⏰ O.S. demorando pra concluir (mais de ${slowHours}h)\n` +
+      `O.S.: ${t.ticketNumber}\n` +
+      `Veículo: ${t.vehiclePlate||'—'}\n` +
+      `Aberta em: ${fmtDate(t.createdAt)}\n` +
+      `Status atual: ${STATUS_LABEL[t.status]||t.status}`
+    );
+    try { await updateDoc(doc(db,'tickets',t.id), {slowNotified:true}); }
+    catch(err){ console.error('Erro ao marcar O.S. como notificada:', err); }
+  }
+}
+
+function renderWhatsappSettings(){
+  const list = document.getElementById('whatsappRecipientsList');
+  if(!list) return;
+  const recipients = whatsappSettings.recipients||[];
+  list.innerHTML = recipients.length ? recipients.map((r,idx)=>`
+    <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px dashed var(--border);">
+      <div style="flex:1;"><strong>${escapeHtml(r.name)}</strong> <span class="mono" style="color:var(--ink-muted); font-size:12.5px;">${escapeHtml(r.phone)}</span></div>
+      <button type="button" class="btn btn-danger btn-xs" onclick="removeWhatsappRecipient(${idx})">Remover</button>
+    </div>`).join('') : '<div style="font-size:12.5px; color:var(--ink-faint);">Nenhum destinatário cadastrado ainda.</div>';
+  const slowInput = document.getElementById('waSlowHours');
+  if(slowInput && document.activeElement !== slowInput) slowInput.value = whatsappSettings.slowHours || 48;
+}
+
+document.getElementById('btnAddWhatsappRecipient').addEventListener('click', async ()=>{
+  const name = document.getElementById('waName').value.trim();
+  const phone = document.getElementById('waPhone').value.trim();
+  const apikey = document.getElementById('waApiKey').value.trim();
+  if(!name || !phone || !apikey){ toast('Preencha nome, telefone e API key.', 'err'); return; }
+  try {
+    await setDoc(doc(db,'settings','whatsapp'), { recipients: arrayUnion({name, phone, apikey}) }, {merge:true});
+    toast('Destinatário adicionado.', 'ok');
+    document.getElementById('waName').value = '';
+    document.getElementById('waPhone').value = '';
+    document.getElementById('waApiKey').value = '';
+  } catch(err){
+    toast('Erro ao adicionar destinatário: '+err.message, 'err');
+  }
+});
+
+async function removeWhatsappRecipient(idx){
+  const r = (whatsappSettings.recipients||[])[idx];
+  if(!r) return;
+  if(!confirm(`Remover ${r.name} dos avisos de WhatsApp?`)) return;
+  try {
+    await setDoc(doc(db,'settings','whatsapp'), { recipients: arrayRemove(r) }, {merge:true});
+    toast('Destinatário removido.', 'ok');
+  } catch(err){
+    toast('Erro ao remover destinatário: '+err.message, 'err');
+  }
+}
+window.removeWhatsappRecipient = removeWhatsappRecipient;
+
+document.getElementById('btnSaveSlowHours').addEventListener('click', async ()=>{
+  const hours = Number(document.getElementById('waSlowHours').value);
+  if(!hours || hours <= 0){ toast('Informe um número de horas válido.', 'err'); return; }
+  try {
+    await setDoc(doc(db,'settings','whatsapp'), { slowHours: hours }, {merge:true});
+    toast('Prazo atualizado.', 'ok');
+  } catch(err){
+    toast('Erro ao salvar prazo: '+err.message, 'err');
+  }
+});
 
 /* ============ HELPERS ============ */
 function fileToDataURL(file){
