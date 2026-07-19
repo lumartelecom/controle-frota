@@ -1968,6 +1968,7 @@ document.getElementById('btnConfirmAdjust').addEventListener('click', async ()=>
 });
 
 async function notifyNewSwapApprovalRequest(s){
+  console.log('[WhatsApp] notifyNewSwapApprovalRequest chamado para', s.id, '— total de destinatários:', (whatsappSettings.recipients||[]).length);
   if(!(whatsappSettings.recipients||[]).length) return;
   const link = `${location.origin}${location.pathname}#trocas/${s.id}`;
   notifyWhatsApp(
@@ -1989,6 +1990,7 @@ function handleSwapDeepLink(){
   const s = swapRequests.find(x=>x.id===m[1]);
   if(!s) return;
   swapDeepLinkHandled = true;
+  history.replaceState(null, '', location.pathname + location.search);
   switchView('trocas');
   openSwapApprovalDetail(s.id);
 }
