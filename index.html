@@ -295,6 +295,19 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 @keyframes barSlide{0%{left:-40%;} 100%{left:100%;}}
 .btn[disabled]{opacity:.65; cursor:not-allowed;}
 
+/* ============ MOLDURA DA FOTO DO VEÍCULO ============ */
+.vehicle-photo-frame{
+  aspect-ratio:16/9; border-radius:12px; border:1px solid var(--border); background:var(--surface-alt);
+  overflow:hidden; box-shadow:var(--shadow-sm);
+}
+.vehicle-photo-frame img{width:100%; height:100%; object-fit:cover; display:block;}
+.vehicle-photo-frame .photo-placeholder{
+  width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; color:var(--ink-faint);
+}
+.vehicle-photo-frame .photo-placeholder .ic{font-size:34px; opacity:.6;}
+.vehicle-photo-frame .photo-placeholder span{font-size:12.5px;}
+
 @media(max-width:860px){
   #sidebar{position:fixed; z-index:90; height:100vh; left:0; top:0; box-shadow:var(--shadow-md);}
   #sidebar:not(.collapsed){width:230px;}
@@ -1330,12 +1343,21 @@ function greetingWord(){
   return 'Boa noite';
 }
 
-// Prioriza a foto mais recente tirada numa vistoria; cai pra foto de cadastro, depois placeholder.
+// Prioriza a foto mais recente tirada numa vistoria; cai pra foto de cadastro. Sem nenhuma
+// das duas, devolve null (quem chama mostra a moldura com o placeholder elegante).
 function vehicleDisplayPhoto(v, inspList){
   if(!v) return null;
   const withPhoto = (inspList||[]).filter(i=>i.photos && i.photos.frente).sort((a,b)=>b.createdAt-a.createdAt);
   if(withPhoto.length) return driveViewableUrl(withPhoto[0].photos.frente);
-  return driveViewableUrl(v.photoURL) || vehiclePlaceholderPhoto(v);
+  return driveViewableUrl(v.photoURL) || null;
+}
+
+// Monta a moldura padrão (proporção fixa, cantos arredondados, borda) usada em toda
+// tela que mostra a foto do veículo — com placeholder elegante quando não há foto.
+function vehiclePhotoFrameHtml(photoUrl){
+  return `<div class="vehicle-photo-frame">${photoUrl
+    ? `<img src="${photoUrl}">`
+    : `<div class="photo-placeholder"><div class="ic">🚐</div><span>Sem foto cadastrada</span></div>`}</div>`;
 }
 
 /* ============ AUTENTICAÇÃO ============ */
@@ -1609,8 +1631,8 @@ function renderMeuCarro(){
   const activeSwap = getActiveSwapRequest();
   wrap.innerHTML = `
     <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
-    <div class="panel" style="overflow:hidden; margin-bottom:20px;">
-      <img src="${photo}" style="width:100%; max-height:220px; object-fit:cover; display:block;">
+    <div class="panel" style="margin-bottom:20px;">
+      <div style="padding:16px 16px 0;">${vehiclePhotoFrameHtml(photo)}</div>
       <div style="padding:18px 20px;">
         <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:8px;">
           <span class="plate" style="font-size:16px;">${escapeHtml(v.plate)}</span>
@@ -1659,8 +1681,8 @@ function renderMeuVeiculo(){
   const photo = vehicleDisplayPhoto(v, myInspections);
   const allTix = [...myTickets].sort((a,b)=>b.createdAt-a.createdAt);
   wrap.innerHTML = `
-    <div class="panel" style="overflow:hidden; margin-bottom:20px;">
-      <img src="${photo}" style="width:100%; max-height:260px; object-fit:cover; display:block;">
+    <div class="panel" style="margin-bottom:20px;">
+      <div style="padding:16px 16px 0;">${vehiclePhotoFrameHtml(photo)}</div>
       <div style="padding:18px 20px;">
         <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px;">
           <span class="plate" style="font-size:16px;">${escapeHtml(v.plate)}</span>
@@ -2294,9 +2316,12 @@ function openVehicleDetail(id){
   const v = vehicles.find(x=>x.id===id);
   if(!v) return;
   document.getElementById('vdTitle').textContent = `${v.plate} — ${(v.brand?v.brand+' ':'')+(v.model||'')}`;
-  document.getElementById('vdPhotoWrap').innerHTML = v.photoURL
-    ? `<img src="${driveViewableUrl(v.photoURL)}" style="max-width:100%; border-radius:10px; border:1px solid var(--border);">`
-    : `<div class="empty-state" style="padding:28px 20px;"><div class="ic">📷</div>Nenhuma foto cadastrada. Clique em "Editar veículo" para adicionar uma.</div>`;
+  // Mesma prioridade de foto usada na tela do motorista: vistoria mais recente > foto cadastrada.
+  // Assim a foto que o staff vê aqui é sempre a mesma que o motorista vê no app dele.
+  const vehicleInspections = inspections.filter(i=>i.vehicleId===id);
+  const vdPhoto = vehicleDisplayPhoto(v, vehicleInspections);
+  document.getElementById('vdPhotoWrap').innerHTML = vehiclePhotoFrameHtml(vdPhoto) +
+    (vdPhoto ? '' : '<div style="font-size:12px; color:var(--ink-faint); text-align:center; margin-top:8px;">Clique em "Editar veículo" para adicionar uma foto.</div>');
   document.getElementById('vdMeta').innerHTML = `
     <span class="plate">${escapeHtml(v.plate)}</span>
     <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
