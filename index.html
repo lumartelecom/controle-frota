@@ -82,6 +82,9 @@ a{color:inherit;}
   display:flex; flex-direction:column; transition:width .18s ease; flex-shrink:0;
 }
 #sidebar.collapsed{width:68px;}
+/* motorista: sidebar sempre se comporta como drawer (some por completo, some por cima do conteúdo) */
+#sidebar.sidebar-drawer{position:fixed; z-index:90; height:100vh; left:0; top:0; width:230px; box-shadow:var(--shadow-md);}
+#sidebar.sidebar-drawer.collapsed{width:0; overflow:hidden; border:none; box-shadow:none;}
 .sb-head{display:flex; align-items:center; gap:10px; padding:18px 16px; border-bottom:1px solid var(--border);}
 .sb-head .mark{width:32px; height:32px; border-radius:8px; background:var(--brand); flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:13px;}
 .sb-head .brand-text{min-width:0; overflow:hidden;}
@@ -103,6 +106,7 @@ a{color:inherit;}
 #topbar{
   height:60px; background:var(--surface); border-bottom:1px solid var(--border);
   display:flex; align-items:center; justify-content:space-between; padding:0 20px; flex-shrink:0;
+  position:relative; z-index:95;
 }
 .tb-left{display:flex; align-items:center; gap:14px;}
 .tb-toggle{background:none; border:none; font-size:18px; color:var(--ink-muted); padding:4px;}
@@ -329,8 +333,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
         <label>Senha</label>
         <input type="password" id="loginPassword" required autocomplete="current-password">
       </div>
-      <div class="login-row">
-        <label><input type="checkbox" id="loginRemember" checked> Permanecer conectado</label>
+      <div class="login-row" style="justify-content:center;">
         <button type="button" class="link-btn" id="btnForgotPw">Esqueci a senha</button>
       </div>
       <button type="submit" class="btn btn-primary" id="btnLogin">Entrar</button>
@@ -355,7 +358,9 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
       <button class="sb-item staff-only-nav" data-view="drivers"><span class="ic">🧑‍✈️</span><span class="sb-label">Motoristas</span></button>
       <button class="sb-item staff-only-nav" data-view="inspections"><span class="ic">📋</span><span class="sb-label">Vistorias</span></button>
       <button class="sb-item staff-only-nav" data-view="tickets"><span class="ic">🛠</span><span class="sb-label">Abrir O.S</span></button>
-      <button class="sb-item hidden" data-view="meucarro" id="navMeuCarro"><span class="ic">🚐</span><span class="sb-label">Meu veículo</span></button>
+      <button class="sb-item staff-only-nav" data-view="trocas"><span class="ic">🔄</span><span class="sb-label">Trocas</span></button>
+      <button class="sb-item hidden" data-view="meucarro" id="navInicio"><span class="ic">🏠</span><span class="sb-label">Início</span></button>
+      <button class="sb-item hidden" data-view="meuveiculo" id="navMeuVeiculo"><span class="ic">🚐</span><span class="sb-label">Meu Veículo</span></button>
       <button class="sb-item hidden" data-view="admin" id="navAdmin"><span class="ic">⚙</span><span class="sb-label">Administração</span></button>
     </nav>
     <div class="sb-foot">
@@ -419,15 +424,20 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
         </div>
       </section>
 
-      <!-- MEU VEÍCULO (motorista) -->
+      <!-- INÍCIO (motorista) -->
       <section id="view-meucarro" class="hidden">
+        <div id="meuCarroContent"></div>
+      </section>
+
+      <!-- MEU VEÍCULO (motorista) -->
+      <section id="view-meuveiculo" class="hidden">
         <div class="section-head">
           <div>
-            <h2>Meu veículo</h2>
-            <div class="desc">Informações do veículo vinculado a você e suas ordens de serviço</div>
+            <h2>Meu Veículo</h2>
+            <div class="desc">Dados completos do veículo vinculado a você</div>
           </div>
         </div>
-        <div id="meuCarroContent"></div>
+        <div id="meuVeiculoContent"></div>
       </section>
 
       <!-- VEHICLES -->
@@ -564,6 +574,36 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
           </div>
           <div id="ticketsPagination" class="pagination-bar"></div>
           <div id="ticketsEmpty" class="empty-state hidden"><div class="ic">🛠</div>Nenhuma O.S. registrada ainda. Bom sinal — ou ninguém abriu a primeira.</div>
+        </div>
+      </section>
+
+      <!-- TROCAS DE VEÍCULO -->
+      <section id="view-trocas" class="hidden">
+        <div class="section-head">
+          <div>
+            <h2>Trocas de Veículo</h2>
+            <div class="desc" id="swapCountDesc">Carregando solicitações…</div>
+          </div>
+          <div class="toolbar">
+            <select class="search-input" id="swapFilterStatus" style="padding-left:12px; min-width:190px;">
+              <option value="">Todos os status</option>
+              <option value="VISTORIA_PENDENTE">Vistoria pendente</option>
+              <option value="AJUSTES">Ajustes solicitados</option>
+              <option value="AGUARDANDO_APROVACAO">Aguardando aprovação</option>
+              <option value="APROVADA">Aprovada</option>
+              <option value="REPROVADA">Reprovada</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="table-scroll">
+            <table>
+              <thead id="swapThead"></thead>
+              <tbody id="swapTbody"></tbody>
+            </table>
+          </div>
+          <div id="swapPagination" class="pagination-bar"></div>
+          <div id="swapEmpty" class="empty-state hidden"><div class="ic">🔄</div>Nenhuma solicitação de troca registrada ainda.</div>
         </div>
       </section>
 
@@ -950,6 +990,120 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
   </div>
 </div>
 
+<!-- ============ MODAL: SOLICITAR TROCA DE VEÍCULO (motorista) ============ -->
+<div class="modal-backdrop hidden" id="modalSwapRequest">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Solicitar troca de veículo</h3><button class="modal-close" data-close="modalSwapRequest">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field full"><label>Veículo atual</label><input id="swReqFromLabel" disabled></div>
+        <div class="field full">
+          <label>Veículo solicitado *</label>
+          <select id="swReqToVehicle" required></select>
+        </div>
+        <div class="field">
+          <label>Motivo da troca *</label>
+          <select id="swReqReason" required>
+            <option value="Manutenção">Manutenção</option>
+            <option value="Sinistro">Sinistro / Acidente</option>
+            <option value="Outro">Outro motivo</option>
+          </select>
+        </div>
+        <div class="field full"><label>Observações</label><textarea id="swReqObservations" rows="3" style="width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--ink);"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalSwapRequest">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveSwapRequest">Enviar solicitação</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: ACOMPANHAR SOLICITAÇÃO DE TROCA (motorista) ============ -->
+<div class="modal-backdrop hidden" id="modalSwapProgress">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="spTitle">Solicitação de troca</h3><button class="modal-close" data-close="modalSwapProgress">×</button></div>
+    <div class="modal-body">
+      <div id="spMeta" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px;"></div>
+      <p style="font-size:13px; color:var(--ink-muted); margin-bottom:12px;">A troca só é enviada para aprovação depois que as duas vistorias abaixo forem concluídas.</p>
+      <div id="spTasks"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalSwapProgress">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: VISTORIA DA TROCA (devolução/recebimento) ============ -->
+<div class="modal-backdrop hidden" id="modalSwapInspection">
+  <div class="modal-box wide">
+    <div class="modal-head"><h3 id="swInspTitle">Vistoria</h3><button class="modal-close" data-close="modalSwapInspection">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field"><label>KM atual *</label><input id="swInspKm" type="number" min="0" required></div>
+
+        <div class="field full">
+          <label>Checklist de itens</label>
+          <div id="swInspChecklist"></div>
+        </div>
+
+        <div class="field full">
+          <label>Fotos da vistoria</label>
+          <div class="photo-slots">
+            <div class="photo-slot"><label>Frente</label><input type="file" id="swInspPhotoFrente" accept="image/*"></div>
+            <div class="photo-slot"><label>Traseira</label><input type="file" id="swInspPhotoTraseira" accept="image/*"></div>
+            <div class="photo-slot"><label>Lateral esquerda</label><input type="file" id="swInspPhotoLatEsq" accept="image/*"></div>
+            <div class="photo-slot"><label>Lateral direita</label><input type="file" id="swInspPhotoLatDir" accept="image/*"></div>
+            <div class="photo-slot"><label>Painel / Hodômetro</label><input type="file" id="swInspPhotoPainel" accept="image/*"></div>
+            <div class="photo-slot"><label>Interior</label><input type="file" id="swInspPhotoInterior" accept="image/*"></div>
+          </div>
+        </div>
+
+        <div class="field full"><label>Observações gerais</label><textarea id="swInspObservations" rows="3" style="width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--ink);"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalSwapInspection">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveSwapInspection">Concluir vistoria</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: APROVAÇÃO DE TROCA (staff) ============ -->
+<div class="modal-backdrop hidden" id="modalSwapApprovalDetail">
+  <div class="modal-box wide">
+    <div class="modal-head"><h3 id="saTitle">Solicitação de troca</h3><button class="modal-close" data-close="modalSwapApprovalDetail">×</button></div>
+    <div class="modal-body">
+      <div id="saMeta" style="margin-bottom:14px;"></div>
+      <div id="saDecisionInfo"></div>
+
+      <h4 style="font-size:13px; margin-bottom:8px;">Vistoria do veículo devolvido</h4>
+      <div id="saReturnWrap" style="margin-bottom:20px;"></div>
+
+      <h4 style="font-size:13px; margin-bottom:8px;">Vistoria do veículo recebido</h4>
+      <div id="saReceiveWrap" style="margin-bottom:20px;"></div>
+
+      <div class="hidden" id="saAdjustPanel" style="border-top:1px solid var(--border); padding-top:16px; margin-top:6px;">
+        <div class="form-grid">
+          <div class="field full">
+            <label>Qual vistoria precisa de ajuste? *</label>
+            <select id="saAdjustLeg">
+              <option value="devolucao">Veículo devolvido</option>
+              <option value="recebimento">Veículo recebido</option>
+            </select>
+          </div>
+          <div class="field full"><label>O que o motorista precisa corrigir? *</label><textarea id="saAdjustNote" rows="2" style="width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--ink);"></textarea></div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+          <button type="button" class="btn btn-ghost btn-sm" id="btnCancelAdjust">Cancelar</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnConfirmAdjust">Confirmar pedido de ajuste</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot" id="saFoot"></div>
+  </div>
+</div>
+
 <div id="printArea" class="hidden"></div>
 
 <script type="module">
@@ -984,19 +1138,27 @@ let inspections = [];
 let vehicleSwaps = [];
 let myVehicle = null;
 let myTickets = [];
+let myInspections = [];
+let mySwapRequests = [];
+let swapAvailableVehicles = [];
+let currentSwapLeg = null;
 let allRoles = [];
 let whatsappSettings = { recipients: [], slowHours: 48 };
 let ticketsListenerReady = false;
+let swapRequestsListenerReady = false;
+let swapDeepLinkHandled = false;
 let slowTicketCheckInterval = null;
 let unsubscribers = [];
+let swapRequests = [];
+let currentSwapApprovalId = null;
 
 /* ============ ORDENAÇÃO / PAGINAÇÃO DE TABELAS ============ */
 const TABLE_PAGE_SIZE = 10;
 const tableSortState = {
   vehicles: {key:null, dir:1}, drivers: {key:null, dir:1},
-  inspections: {key:null, dir:1}, tickets: {key:null, dir:1},
+  inspections: {key:null, dir:1}, tickets: {key:null, dir:1}, trocas: {key:null, dir:1},
 };
-const tablePageState = { vehicles:1, drivers:1, inspections:1, tickets:1 };
+const tablePageState = { vehicles:1, drivers:1, inspections:1, tickets:1, trocas:1 };
 
 function sortRows(rows, sortState, accessors){
   if(!sortState.key || !accessors[sortState.key]) return rows;
@@ -1046,7 +1208,7 @@ function paginateRows(table, rows){
 }
 
 window.toggleSortTable = function(table, key){
-  const rerenderMap = { vehicles: ()=>renderVehicles(), drivers: ()=>renderDrivers(), inspections: ()=>renderInspections(), tickets: ()=>renderTickets() };
+  const rerenderMap = { vehicles: ()=>renderVehicles(), drivers: ()=>renderDrivers(), inspections: ()=>renderInspections(), tickets: ()=>renderTickets(), trocas: ()=>renderSwapRequests() };
   toggleSort(table, key, rerenderMap[table]);
 };
 
@@ -1086,11 +1248,16 @@ const CHECKLIST_ITEMS = [
   {key:'documentacao', label:'Documentação (CRLV / tacógrafo)', category:'Documentação'},
   {key:'equipamentos', label:'Equipamentos obrigatórios (extintor, triângulo, macaco)', category:'Outro'},
   {key:'avarias', label:'Lataria, vidros e retrovisores (avarias)', category:'Funilaria'},
+  {key:'combustivel', label:'Nível de combustível', category:null},
   {key:'limpeza', label:'Limpeza interna e externa', category:null},
 ];
 const RESULT_LABEL = {APROVADO:'Aprovado', RESSALVAS:'Aprovado c/ ressalvas', REPROVADO:'Reprovado'};
 const CHECKLIST_STATUS_LABEL = {ok:'OK', problema:'Problema', na:'N/A'};
-const PHOTO_SLOT_LABEL = {frente:'Frente', traseira:'Traseira', lateralEsq:'Lateral esquerda', lateralDir:'Lateral direita', painel:'Painel / KM'};
+const PHOTO_SLOT_LABEL = {frente:'Frente', traseira:'Traseira', lateralEsq:'Lateral esquerda', lateralDir:'Lateral direita', painel:'Painel / KM', interior:'Interior'};
+const SWAP_STATUS_LABEL = {
+  VISTORIA_PENDENTE:'Vistoria pendente', AGUARDANDO_APROVACAO:'Aguardando aprovação',
+  AJUSTES:'Ajustes solicitados', APROVADA:'Aprovada', REPROVADA:'Reprovada',
+};
 
 
 function toast(msg, type=''){
@@ -1117,6 +1284,21 @@ function vehiclePlaceholderPhoto(v){
     <text x="50%" y="80%" font-size="18" text-anchor="middle" fill="#8B96AC" font-family="sans-serif">${modelText}</text>
   </svg>`;
   return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+function greetingWord(){
+  const h = new Date().getHours();
+  if(h < 12) return 'Bom dia';
+  if(h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+// Prioriza a foto mais recente tirada numa vistoria; cai pra foto de cadastro, depois placeholder.
+function vehicleDisplayPhoto(v, inspList){
+  if(!v) return null;
+  const withPhoto = (inspList||[]).filter(i=>i.photos && i.photos.frente).sort((a,b)=>b.createdAt-a.createdAt);
+  if(withPhoto.length) return withPhoto[0].photos.frente;
+  return v.photoURL || vehiclePlaceholderPhoto(v);
 }
 
 /* ============ AUTENTICAÇÃO ============ */
@@ -1186,8 +1368,14 @@ function boot(){
   const isAdmin = currentUser.role === 'admin';
   document.getElementById('navAdmin').classList.toggle('hidden', !isAdmin);
   document.querySelectorAll('.staff-only-nav').forEach(el=>el.classList.toggle('hidden', isMotorista));
-  document.getElementById('navMeuCarro').classList.toggle('hidden', !isMotorista);
+  document.getElementById('navInicio').classList.toggle('hidden', !isMotorista);
+  document.getElementById('navMeuVeiculo').classList.toggle('hidden', !isMotorista);
   document.querySelectorAll('.admin-only-col').forEach(el=>el.classList.toggle('hidden', !isAdmin));
+
+  // motorista: sidebar vira um drawer que só aparece ao tocar no ☰, pra deixar a tela inicial limpa
+  const sidebarEl = document.getElementById('sidebar');
+  sidebarEl.classList.toggle('sidebar-drawer', isMotorista);
+  if(isMotorista) sidebarEl.classList.add('collapsed');
 
   if(isMotorista){
     attachMotoristaListeners();
@@ -1240,6 +1428,22 @@ function attachStaffListeners(){
     vehicleSwaps = snap.docs.map(d=>({id:d.id, ...d.data()}));
   }, err=>toast('Erro lendo trocas: '+err.message, 'err')));
 
+  swapRequestsListenerReady = false;
+  unsubscribers.push(onSnapshot(collection(db,'swapRequests'), snap=>{
+    if(swapRequestsListenerReady){
+      snap.docChanges().forEach(change=>{
+        const data = change.doc.data();
+        if(change.type==='modified' && data.status==='AGUARDANDO_APROVACAO' && !data.notifiedApproval){
+          notifyNewSwapApprovalRequest({id:change.doc.id, ...data});
+        }
+      });
+    }
+    swapRequests = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderSwapRequests();
+    swapRequestsListenerReady = true;
+    handleSwapDeepLink();
+  }, err=>toast('Erro lendo solicitações de troca: '+err.message, 'err')));
+
   unsubscribers.push(onSnapshot(doc(db,'settings','whatsapp'), snap=>{
     whatsappSettings = snap.exists() ? { recipients:[], slowHours:48, ...snap.data() } : { recipients:[], slowHours:48 };
     console.log('[WhatsApp] settings/whatsapp carregado:', JSON.stringify(whatsappSettings));
@@ -1252,25 +1456,46 @@ function attachStaffListeners(){
 }
 
 function attachMotoristaListeners(){
+  renderChecklistInto('swInspChecklist', 'sw');
   if(!currentUser.driverId){
     myVehicle = null; myTickets = [];
     renderMeuCarro();
     return;
   }
+  const sq = query(collection(db,'swapRequests'), where('driverId','==', currentUser.driverId));
+  const unsubS = onSnapshot(sq, ssnap=>{
+    mySwapRequests = ssnap.docs.map(d=>({id:d.id, ...d.data()}));
+    renderMeuCarro();
+  }, err=>toast('Erro lendo solicitações de troca: '+err.message, 'err'));
+  unsubscribers.push(unsubS);
+
+  const avq = query(collection(db,'vehicles'), where('status','==','disponivel'));
+  const unsubAv = onSnapshot(avq, avsnap=>{
+    swapAvailableVehicles = avsnap.docs.map(d=>({id:d.id, ...d.data()}));
+  }, err=>toast('Erro lendo veículos disponíveis: '+err.message, 'err'));
+  unsubscribers.push(unsubAv);
+
   const vq = query(collection(db,'vehicles'), where('driverId','==', currentUser.driverId));
   const unsubV = onSnapshot(vq, snap=>{
     myVehicle = snap.empty ? null : {id:snap.docs[0].id, ...snap.docs[0].data()};
-    renderMeuCarro();
+    renderMeuCarro(); renderMeuVeiculo();
     if(myVehicle){
       const tq = query(collection(db,'tickets'), where('vehicleId','==', myVehicle.id));
       const unsubT = onSnapshot(tq, tsnap=>{
         myTickets = tsnap.docs.map(d=>({id:d.id, ...d.data()}));
-        renderMeuCarro();
+        renderMeuCarro(); renderMeuVeiculo();
       }, err=>toast('Erro lendo suas O.S.: '+err.message, 'err'));
       unsubscribers.push(unsubT);
+
+      const iq = query(collection(db,'inspections'), where('vehicleId','==', myVehicle.id));
+      const unsubI = onSnapshot(iq, isnap=>{
+        myInspections = isnap.docs.map(d=>({id:d.id, ...d.data()}));
+        renderMeuCarro(); renderMeuVeiculo();
+      }, err=>toast('Erro lendo vistorias do veículo: '+err.message, 'err'));
+      unsubscribers.push(unsubI);
     } else {
-      myTickets = [];
-      renderMeuCarro();
+      myTickets = []; myInspections = [];
+      renderMeuCarro(); renderMeuVeiculo();
     }
   }, err=>toast('Erro lendo seu veículo: '+err.message, 'err'));
   unsubscribers.push(unsubV);
@@ -1284,15 +1509,15 @@ if(isMobileViewport()) document.getElementById('sidebar').classList.add('collaps
 document.querySelectorAll('.sb-item[data-view]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     switchView(btn.dataset.view);
-    if(isMobileViewport()) document.getElementById('sidebar').classList.add('collapsed');
+    if(isMobileViewport() || (currentUser && currentUser.role==='motorista')) document.getElementById('sidebar').classList.add('collapsed');
   });
 });
 function switchView(view, filter){
   document.querySelectorAll('.sb-item[data-view]').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
-  ['dashboard','vehicles','drivers','inspections','tickets','admin','meucarro'].forEach(v=>{
+  ['dashboard','vehicles','drivers','inspections','tickets','trocas','admin','meucarro','meuveiculo'].forEach(v=>{
     document.getElementById('view-'+v).classList.toggle('hidden', v!==view);
   });
-  const titles = {dashboard:'Dashboard', vehicles:'Veículos', drivers:'Motoristas', inspections:'Vistorias de Veículos', tickets:'Ordens de Serviço', admin:'Administração', meucarro:'Meu veículo'};
+  const titles = {dashboard:'Dashboard', vehicles:'Veículos', drivers:'Motoristas', inspections:'Vistorias de Veículos', tickets:'Ordens de Serviço', trocas:'Trocas de Veículo', admin:'Administração', meucarro:'Início', meuveiculo:'Meu Veículo'};
   document.getElementById('viewTitle').textContent = titles[view];
 
   if(view==='vehicles'){
@@ -1312,49 +1537,460 @@ function switchView(view, filter){
     tablePageState.tickets = 1;
     renderTickets();
   }
+  if(view==='trocas'){
+    tablePageState.trocas = 1;
+    renderSwapRequests();
+  }
   if(view==='meucarro'){
     renderMeuCarro();
+  }
+  if(view==='meuveiculo'){
+    renderMeuVeiculo();
   }
 }
 window.switchView = switchView;
 
-/* ============ MEU VEÍCULO (visão do motorista) ============ */
+/* ============ INÍCIO / MEU VEÍCULO (visão do motorista) ============ */
 function renderMeuCarro(){
   const wrap = document.getElementById('meuCarroContent');
+  if(!wrap) return;
+  const v = myVehicle;
+  const firstName = escapeHtml((currentUser?.name||'').trim().split(/\s+/)[0] || '');
+  if(!v){
+    wrap.innerHTML = `
+      <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
+      <div class="panel"><div class="empty-state"><div class="ic">🚐</div>Nenhum veículo vinculado ao seu usuário ainda. Fale com o administrador.</div></div>`;
+    return;
+  }
+  const photo = vehicleDisplayPhoto(v, myInspections);
+  const openTix = [...myTickets].filter(t=>t.status!=='CONCLUIDO').sort((a,b)=>b.createdAt-a.createdAt);
+  const activeSwap = getActiveSwapRequest();
+  wrap.innerHTML = `
+    <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
+    <div class="panel" style="overflow:hidden; margin-bottom:20px;">
+      <img src="${photo}" style="width:100%; max-height:220px; object-fit:cover; display:block;">
+      <div style="padding:18px 20px;">
+        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:8px;">
+          <span class="plate" style="font-size:16px;">${escapeHtml(v.plate)}</span>
+          <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
+        </div>
+        <div style="font-size:15px; font-weight:600; margin-bottom:4px;">${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</div>
+        <div style="font-size:13px; color:var(--ink-muted);">KM atual: ${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:16px;">
+          <button type="button" class="btn btn-primary btn-sm" id="btnMeuCarroAbrirOS">+ Abrir O.S</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btnSolicitarTroca">🔄 ${activeSwap ? 'Acompanhar solicitação de troca' : 'Solicitar troca de veículo'}</button>
+          ${activeSwap ? `<span style="font-size:12px; color:var(--ink-muted);">${SWAP_STATUS_LABEL[activeSwap.status]||activeSwap.status}</span>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h3>O.S. em aberto</h3></div>
+      <div style="overflow-x:auto;"><table>
+        <thead><tr><th>O.S.</th><th>Prioridade</th><th>Status</th><th>Aberto em</th></tr></thead>
+        <tbody>${openTix.length ? openTix.map(t=>`
+          <tr class="row-click" onclick="openTicketDetail('${t.id}')">
+            <td class="mono">${escapeHtml(t.ticketNumber)}</td>
+            <td><span class="pri-tag pri-${(t.priority||'').toLowerCase()}">${PRIORITY_LABEL[t.priority]||t.priority}</span></td>
+            <td><span class="status-pill st-${t.status}">${STATUS_LABEL[t.status]||t.status}</span></td>
+            <td>${fmtDate(t.createdAt)}</td>
+          </tr>`).join('') : `<tr><td colspan="4" style="text-align:center; color:var(--ink-muted); padding:24px;">Nenhuma O.S. em aberto.</td></tr>`}
+        </tbody>
+      </table></div>
+    </div>
+  `;
+  document.getElementById('btnMeuCarroAbrirOS').addEventListener('click', openTicketModalForMyVehicle);
+  document.getElementById('btnSolicitarTroca').addEventListener('click', ()=>{
+    const active = getActiveSwapRequest();
+    if(active) openSwapProgressModal(active.id);
+    else openSwapRequestModal();
+  });
+}
+
+function renderMeuVeiculo(){
+  const wrap = document.getElementById('meuVeiculoContent');
   if(!wrap) return;
   const v = myVehicle;
   if(!v){
     wrap.innerHTML = `<div class="panel"><div class="empty-state"><div class="ic">🚐</div>Nenhum veículo vinculado ao seu usuário ainda. Fale com o administrador.</div></div>`;
     return;
   }
-  const myTix = [...myTickets].sort((a,b)=>b.createdAt-a.createdAt);
+  const photo = vehicleDisplayPhoto(v, myInspections);
+  const allTix = [...myTickets].sort((a,b)=>b.createdAt-a.createdAt);
   wrap.innerHTML = `
-    <div class="panel" style="padding:20px; margin-bottom:20px;">
-      <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin-bottom:14px;">
-        <span class="plate" style="font-size:16px;">${escapeHtml(v.plate)}</span>
-        <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
-        <span style="font-size:13px; color:var(--ink-muted);">${FLEET_LABEL[v.fleet] || ''}</span>
+    <div class="panel" style="overflow:hidden; margin-bottom:20px;">
+      <img src="${photo}" style="width:100%; max-height:260px; object-fit:cover; display:block;">
+      <div style="padding:18px 20px;">
+        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px;">
+          <span class="plate" style="font-size:16px;">${escapeHtml(v.plate)}</span>
+          <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
+          <span style="font-size:12.5px; color:var(--ink-muted);">${FLEET_LABEL[v.fleet] || 'Sem frota definida'}</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13.5px;">
+          <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Marca</div>${escapeHtml(v.brand||'—')}</div>
+          <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Modelo</div>${escapeHtml(v.model||'—')}</div>
+          <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Ano</div>${v.year||'—'}</div>
+          <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
+          <div class="full" style="grid-column:1/-1;"><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Centro de custo</div>${escapeHtml(v.costCenter||'—')}</div>
+        </div>
       </div>
-      <div style="font-size:14px; margin-bottom:4px;"><strong>${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</strong></div>
-      <div style="font-size:13px; color:var(--ink-muted);">KM atual: ${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
-      <button type="button" class="btn btn-primary btn-sm" style="margin-top:16px;" id="btnMeuCarroAbrirOS">+ Abrir O.S para este veículo</button>
     </div>
     <div class="panel">
-      <div class="panel-head"><h3>Minhas ordens de serviço</h3></div>
+      <div class="panel-head"><h3>Histórico de utilização</h3></div>
       <div style="overflow-x:auto;"><table>
         <thead><tr><th>O.S.</th><th>Prioridade</th><th>Status</th><th>Aberto em</th></tr></thead>
-        <tbody>${myTix.length ? myTix.map(t=>`
+        <tbody>${allTix.length ? allTix.map(t=>`
           <tr class="row-click" onclick="openTicketDetail('${t.id}')">
             <td class="mono">${escapeHtml(t.ticketNumber)}</td>
             <td><span class="pri-tag pri-${(t.priority||'').toLowerCase()}">${PRIORITY_LABEL[t.priority]||t.priority}</span></td>
             <td><span class="status-pill st-${t.status}">${STATUS_LABEL[t.status]||t.status}</span></td>
             <td>${fmtDate(t.createdAt)}</td>
-          </tr>`).join('') : `<tr><td colspan="4" style="text-align:center; color:var(--ink-muted); padding:24px;">Nenhuma O.S. aberta.</td></tr>`}
+          </tr>`).join('') : `<tr><td colspan="4" style="text-align:center; color:var(--ink-muted); padding:24px;">Nenhum histórico ainda.</td></tr>`}
         </tbody>
       </table></div>
     </div>
   `;
-  document.getElementById('btnMeuCarroAbrirOS').addEventListener('click', openTicketModalForMyVehicle);
+}
+
+/* ============ SOLICITAÇÃO DE TROCA DE VEÍCULO (motorista) ============ */
+const SWAP_ACTIVE_STATUSES = ['VISTORIA_PENDENTE','AGUARDANDO_APROVACAO','AJUSTES'];
+function getActiveSwapRequest(){
+  return mySwapRequests.find(s=>SWAP_ACTIVE_STATUSES.includes(s.status));
+}
+
+function openSwapRequestModal(){
+  if(!myVehicle){ toast('Nenhum veículo vinculado ao seu usuário.', 'err'); return; }
+  document.getElementById('swReqFromLabel').value = `${myVehicle.plate} — ${(myVehicle.brand?myVehicle.brand+' ':'')+(myVehicle.model||'')}`;
+  const options = swapAvailableVehicles.filter(v=>v.id!==myVehicle.id)
+    .map(v=>`<option value="${v.id}">${escapeHtml(v.plate)} — ${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</option>`).join('');
+  document.getElementById('swReqToVehicle').innerHTML = options || '<option value="">Nenhum veículo disponível no momento</option>';
+  document.getElementById('swReqReason').value = 'Manutenção';
+  document.getElementById('swReqObservations').value = '';
+  openModal('modalSwapRequest');
+}
+window.openSwapRequestModal = openSwapRequestModal;
+
+document.getElementById('btnSaveSwapRequest').addEventListener('click', async ()=>{
+  if(!myVehicle) return;
+  const toId = document.getElementById('swReqToVehicle').value;
+  if(!toId){ toast('Selecione o veículo solicitado.', 'err'); return; }
+  const toVehicle = swapAvailableVehicles.find(v=>v.id===toId);
+  const reason = document.getElementById('swReqReason').value;
+  const observations = document.getElementById('swReqObservations').value.trim();
+  try {
+    const ref = await addDoc(collection(db,'swapRequests'), {
+      driverId: currentUser.driverId, driverName: currentUser.name,
+      fromVehicleId: myVehicle.id, fromPlate: myVehicle.plate,
+      toVehicleId: toId, toPlate: toVehicle?.plate || '—',
+      reason, observations, status:'VISTORIA_PENDENTE',
+      returnInspectionId: null, receiveInspectionId: null,
+      createdAt: Date.now(),
+    });
+    toast('Solicitação criada. Agora é só concluir as duas vistorias.', 'ok');
+    closeModal('modalSwapRequest');
+    mySwapRequests.push({id:ref.id, driverId:currentUser.driverId, fromVehicleId:myVehicle.id, fromPlate:myVehicle.plate, toVehicleId:toId, toPlate:toVehicle?.plate||'—', reason, observations, status:'VISTORIA_PENDENTE', returnInspectionId:null, receiveInspectionId:null, createdAt:Date.now()});
+    renderMeuCarro();
+    openSwapProgressModal(ref.id);
+  } catch(err){
+    toast('Erro ao criar solicitação: '+err.message, 'err');
+  }
+});
+
+function openSwapProgressModal(id){
+  const s = mySwapRequests.find(x=>x.id===id);
+  if(!s) return;
+  document.getElementById('spTitle').textContent = `${s.fromPlate} → ${s.toPlate}`;
+  document.getElementById('spMeta').innerHTML = `
+    <span style="font-size:13px; color:var(--ink-muted);">Motivo: ${escapeHtml(s.reason)}</span>
+    <span class="badge badge-reserva">${SWAP_STATUS_LABEL[s.status]||s.status}</span>
+  `;
+  const adjustNote = s.status==='AJUSTES' && s.decisionNotes
+    ? `<div class="report-box" style="margin-bottom:14px;"><div class="report-box-head">O que precisa ajustar</div><div class="report-box-body">${escapeHtml(s.decisionNotes)}</div></div>`
+    : '';
+  const decidedNote = ['APROVADA','REPROVADA'].includes(s.status) && s.decidedBy
+    ? `<div style="font-size:12.5px; color:var(--ink-muted); margin-bottom:14px;">Decidido por ${escapeHtml(s.decidedBy)} em ${fmtDate(s.decidedAt)}${s.decisionNotes ? ' — '+escapeHtml(s.decisionNotes) : ''}</div>`
+    : '';
+  document.getElementById('spTasks').innerHTML = adjustNote + decidedNote + `
+    <div class="chk-row">
+      <div class="chk-label">Vistoria do veículo devolvido (${escapeHtml(s.fromPlate)})</div>
+      ${s.returnInspectionId ? '<span class="badge badge-disponivel">Concluída</span>' : `<button type="button" class="btn btn-primary btn-xs" id="spBtnReturn">Fazer vistoria</button>`}
+    </div>
+    <div class="chk-row">
+      <div class="chk-label">Vistoria do veículo recebido (${escapeHtml(s.toPlate)})</div>
+      ${s.receiveInspectionId ? '<span class="badge badge-disponivel">Concluída</span>' : `<button type="button" class="btn btn-primary btn-xs" id="spBtnReceive">Fazer vistoria</button>`}
+    </div>
+  `;
+  if(!s.returnInspectionId){
+    document.getElementById('spBtnReturn').onclick = ()=>{ closeModal('modalSwapProgress'); openSwapInspectionModal(s, 'devolucao'); };
+  }
+  if(!s.receiveInspectionId){
+    document.getElementById('spBtnReceive').onclick = ()=>{ closeModal('modalSwapProgress'); openSwapInspectionModal(s, 'recebimento'); };
+  }
+  openModal('modalSwapProgress');
+}
+window.openSwapProgressModal = openSwapProgressModal;
+
+function openSwapInspectionModal(s, leg){
+  const vehicleId = leg==='devolucao' ? s.fromVehicleId : s.toVehicleId;
+  const plate = leg==='devolucao' ? s.fromPlate : s.toPlate;
+  currentSwapLeg = { swapRequestId: s.id, leg, vehicleId, plate };
+  document.getElementById('swInspTitle').textContent = `Vistoria — veículo ${leg==='devolucao'?'devolvido':'recebido'}: ${plate}`;
+  document.getElementById('swInspKm').value = '';
+  document.getElementById('swInspObservations').value = '';
+  CHECKLIST_ITEMS.forEach(item=>{
+    document.getElementById('swchk_'+item.key).value = 'ok';
+    const obs = document.getElementById('swchkobs_'+item.key);
+    obs.value = '';
+    obs.classList.add('hidden');
+  });
+  ['swInspPhotoFrente','swInspPhotoTraseira','swInspPhotoLatEsq','swInspPhotoLatDir','swInspPhotoPainel','swInspPhotoInterior'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  openModal('modalSwapInspection');
+}
+
+document.getElementById('btnSaveSwapInspection').addEventListener('click', async ()=>{
+  if(!currentSwapLeg) return;
+  const kmRaw = document.getElementById('swInspKm').value;
+  if(!kmRaw){ toast('Informe a quilometragem.', 'err'); return; }
+  const km = Number(kmRaw);
+  const observations = document.getElementById('swInspObservations').value.trim();
+  const checklist = [];
+  let hasProblem = false;
+  CHECKLIST_ITEMS.forEach(item=>{
+    const status = document.getElementById('swchk_'+item.key).value;
+    const obs = document.getElementById('swchkobs_'+item.key).value.trim();
+    if(status==='problema') hasProblem = true;
+    checklist.push({...item, status, obs});
+  });
+  const result = hasProblem ? 'RESSALVAS' : 'APROVADO';
+
+  const { swapRequestId, leg, vehicleId, plate } = currentSwapLeg;
+  const subfolder = driveVehicleFolder('VISTORIAS', plate, currentUser.name);
+  const photoSlotIds = {frente:'swInspPhotoFrente', traseira:'swInspPhotoTraseira', lateralEsq:'swInspPhotoLatEsq', lateralDir:'swInspPhotoLatDir', painel:'swInspPhotoPainel', interior:'swInspPhotoInterior'};
+  const photos = {};
+  for(const [key, id] of Object.entries(photoSlotIds)){
+    const file = document.getElementById(id).files[0];
+    if(file) photos[key] = await processPhoto(file, subfolder);
+  }
+  const driveTextFileId = await uploadTextToDrive(
+    `VISTORIA DE TROCA (${leg==='devolucao'?'veículo devolvido':'veículo recebido'}) — ${plate}\n\n` +
+    `Motorista: ${currentUser.name}\n` +
+    `KM: ${km}\n` +
+    `Resultado: ${RESULT_LABEL[result]}\n` +
+    `Data: ${fmtDate(Date.now())}\n\n` +
+    `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
+    `Observações:\n${observations || '—'}\n`,
+    `${new Date().toISOString().slice(0,10)}_vistoria_troca_${leg}.txt`, subfolder
+  );
+
+  try {
+    const inspRef = await addDoc(collection(db,'inspections'), {
+      vehicleId, vehiclePlate: plate, driverId: currentUser.driverId, km, result, checklist, photos,
+      extraPhotos:[], observations, driveTextFileId,
+      swapRequestId, swapType: leg,
+      createdBy: currentUser.name, createdAt: Date.now(), generatedTickets:[],
+    });
+    const s = mySwapRequests.find(x=>x.id===swapRequestId);
+    const field = leg==='devolucao' ? 'returnInspectionId' : 'receiveInspectionId';
+    const otherField = leg==='devolucao' ? 'receiveInspectionId' : 'returnInspectionId';
+    const bothDone = !!(s && s[otherField]);
+    await updateDoc(doc(db,'swapRequests',swapRequestId), {
+      [field]: inspRef.id,
+      status: bothDone ? 'AGUARDANDO_APROVACAO' : 'VISTORIA_PENDENTE',
+    });
+    if(s){ s[field] = inspRef.id; s.status = bothDone ? 'AGUARDANDO_APROVACAO' : 'VISTORIA_PENDENTE'; }
+    renderMeuCarro();
+    toast('Vistoria registrada.' + (bothDone ? ' Solicitação enviada para aprovação.' : ' Falta a vistoria do outro veículo.'), 'ok');
+    closeModal('modalSwapInspection');
+    currentSwapLeg = null;
+  } catch(err){
+    toast('Erro ao salvar vistoria: '+err.message, 'err');
+  }
+});
+
+/* ============ TROCAS DE VEÍCULO — APROVAÇÃO (staff) ============ */
+function renderSwapRequests(){
+  const statusFilter = document.getElementById('swapFilterStatus').value;
+  let filtered = swapRequests.filter(s => !statusFilter || s.status===statusFilter);
+  filtered = sortRows(filtered, tableSortState.trocas, {
+    date: s=>s.createdAt||0, driver: s=>s.driverName||driverName(s.driverId),
+    from: s=>s.fromPlate||'', to: s=>s.toPlate||'',
+    status: s=>SWAP_STATUS_LABEL[s.status]||'', decidedBy: s=>s.decidedBy||'',
+  });
+  if(!tableSortState.trocas.key) filtered = [...filtered].sort((a,b)=>b.createdAt-a.createdAt);
+  document.getElementById('swapCountDesc').textContent = `${swapRequests.length} solicitação(ões) de troca`;
+  document.getElementById('swapEmpty').classList.toggle('hidden', filtered.length>0);
+  document.getElementById('swapThead').innerHTML = `<tr>
+    ${sortableTh('trocas','date','Data')}${sortableTh('trocas','driver','Motorista')}${sortableTh('trocas','from','De')}
+    ${sortableTh('trocas','to','Para')}${sortableTh('trocas','status','Status')}${sortableTh('trocas','decidedBy','Decidido por')}
+  </tr>`;
+  document.getElementById('swapTbody').innerHTML = paginateRows('trocas', filtered).map(s=>`
+    <tr class="row-click" onclick="openSwapApprovalDetail('${s.id}')">
+      <td>${fmtDate(s.createdAt)}</td>
+      <td>${escapeHtml(s.driverName||driverName(s.driverId))}</td>
+      <td><span class="plate">${escapeHtml(s.fromPlate)}</span></td>
+      <td><span class="plate">${escapeHtml(s.toPlate)}</span></td>
+      <td><span class="badge badge-${s.status==='APROVADA'?'disponivel':s.status==='REPROVADA'?'sinistrado':'reserva'}">${SWAP_STATUS_LABEL[s.status]||s.status}</span></td>
+      <td>${escapeHtml(s.decidedBy||'—')}</td>
+    </tr>`).join('');
+  renderPaginationBar('trocas', 'swapPagination', filtered.length, renderSwapRequests);
+}
+document.getElementById('swapFilterStatus').addEventListener('change', ()=>{ tablePageState.trocas=1; renderSwapRequests(); });
+
+function inspectionSummaryHtml(insp){
+  if(!insp) return '<div class="empty-state" style="padding:18px;"><div class="ic">📋</div>Vistoria ainda não realizada.</div>';
+  const checklistHtml = (insp.checklist||[]).map(c=>`
+    <div class="chk-row">
+      <div class="chk-label">${escapeHtml(c.label)}</div>
+      <span class="badge badge-${c.status==='ok'?'disponivel':c.status==='problema'?'sinistrado':'reserva'}">${CHECKLIST_STATUS_LABEL[c.status]}</span>
+      ${c.obs ? `<div class="chk-obs" style="border:none; background:none; padding:0; color:var(--ink-muted); font-size:12.5px;">${escapeHtml(c.obs)}</div>` : ''}
+    </div>`).join('');
+  const photoEntries = [];
+  Object.entries(insp.photos||{}).forEach(([key,src])=>photoEntries.push({label:PHOTO_SLOT_LABEL[key]||key, src}));
+  const photosHtml = photoEntries.length
+    ? `<div class="photo-gallery" style="margin-top:10px;">${photoEntries.map(p=>`<img src="${p.src}" title="${escapeHtml(p.label)}" onclick="window.open('${p.src}','_blank')">`).join('')}</div>`
+    : '<div style="font-size:12.5px; color:var(--ink-faint); margin-top:8px;">Nenhuma foto anexada.</div>';
+  return `
+    <div style="margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <span class="result-pill res-${insp.result}">${RESULT_LABEL[insp.result]}</span>
+      <span style="font-size:12px; color:var(--ink-muted);">KM ${Number(insp.km).toLocaleString('pt-BR')} · ${fmtDate(insp.createdAt)}</span>
+    </div>
+    ${checklistHtml}
+    ${photosHtml}
+    ${insp.observations ? `<div style="margin-top:10px; font-size:12.5px; color:var(--ink-muted);"><strong>Observações:</strong> ${escapeHtml(insp.observations)}</div>` : ''}
+  `;
+}
+
+function openSwapApprovalDetail(id){
+  const s = swapRequests.find(x=>x.id===id);
+  if(!s) return;
+  currentSwapApprovalId = id;
+  document.getElementById('saTitle').textContent = `${s.fromPlate} → ${s.toPlate}`;
+  document.getElementById('saMeta').innerHTML = `
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:8px;">
+      <span class="plate">${escapeHtml(s.fromPlate)}</span> → <span class="plate">${escapeHtml(s.toPlate)}</span>
+      <span class="badge badge-${s.status==='APROVADA'?'disponivel':s.status==='REPROVADA'?'sinistrado':'reserva'}">${SWAP_STATUS_LABEL[s.status]||s.status}</span>
+    </div>
+    <div style="font-size:13px; color:var(--ink-muted);">
+      Motorista: ${escapeHtml(s.driverName||driverName(s.driverId))} · Motivo: ${escapeHtml(s.reason)} · ${fmtDate(s.createdAt)}
+      ${s.observations ? '<br>Observações do motorista: '+escapeHtml(s.observations) : ''}
+    </div>
+  `;
+  const isPending = s.status === 'AGUARDANDO_APROVACAO';
+  document.getElementById('saDecisionInfo').innerHTML = (!isPending && s.decidedBy) ? `
+    <div style="font-size:12.5px; color:var(--ink-muted); margin:10px 0 14px; padding:10px 12px; background:var(--surface-alt); border-radius:8px;">
+      Decidido por ${escapeHtml(s.decidedBy)} em ${fmtDate(s.decidedAt)}${s.decisionNotes ? ' — '+escapeHtml(s.decisionNotes) : ''}
+    </div>` : '';
+
+  const returnInsp = inspections.find(i=>i.id===s.returnInspectionId);
+  const receiveInsp = inspections.find(i=>i.id===s.receiveInspectionId);
+  document.getElementById('saReturnWrap').innerHTML = inspectionSummaryHtml(returnInsp);
+  document.getElementById('saReceiveWrap').innerHTML = inspectionSummaryHtml(receiveInsp);
+
+  document.getElementById('saAdjustPanel').classList.add('hidden');
+  document.getElementById('saAdjustNote').value = '';
+
+  const canDecide = isPending && ['admin','supervisor'].includes(currentUser.role);
+  document.getElementById('saFoot').innerHTML = canDecide ? `
+    <button type="button" class="btn btn-ghost btn-sm" data-close="modalSwapApprovalDetail">Fechar</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="saBtnAdjust">Pedir ajuste</button>
+    <button type="button" class="btn btn-danger btn-sm" id="saBtnReject">Reprovar</button>
+    <button type="button" class="btn btn-primary btn-sm" id="saBtnApprove">Aprovar</button>
+  ` : `<button type="button" class="btn btn-ghost btn-sm" data-close="modalSwapApprovalDetail">Fechar</button>`;
+  document.getElementById('saFoot').querySelector('[data-close]').addEventListener('click', ()=>closeModal('modalSwapApprovalDetail'));
+
+  if(canDecide){
+    document.getElementById('saBtnApprove').onclick = ()=>approveSwapRequest(s);
+    document.getElementById('saBtnReject').onclick = ()=>rejectSwapRequest(s);
+    document.getElementById('saBtnAdjust').onclick = ()=>{ document.getElementById('saAdjustPanel').classList.remove('hidden'); };
+  }
+  openModal('modalSwapApprovalDetail');
+}
+window.openSwapApprovalDetail = openSwapApprovalDetail;
+
+async function approveSwapRequest(s){
+  if(!confirm(`Aprovar a troca ${s.fromPlate} → ${s.toPlate}? O veículo do motorista será trocado automaticamente.`)) return;
+  try {
+    const batch = writeBatch(db);
+    batch.update(doc(db,'swapRequests',s.id), {
+      status:'APROVADA', decidedBy: currentUser.name, decidedAt: Date.now(), decisionNotes: '',
+    });
+    batch.update(doc(db,'vehicles',s.fromVehicleId), {
+      status: s.reason==='Manutenção' ? 'em-manutencao' : (s.reason==='Sinistro' ? 'sinistrado' : 'reserva'),
+      driverId: null,
+    });
+    batch.update(doc(db,'vehicles',s.toVehicleId), {
+      status: 'em-uso', driverId: s.driverId,
+    });
+    await batch.commit();
+    toast('Troca aprovada e veículos atualizados.', 'ok');
+    closeModal('modalSwapApprovalDetail');
+  } catch(err){
+    toast('Erro ao aprovar troca: '+err.message, 'err');
+  }
+}
+
+async function rejectSwapRequest(s){
+  const notes = prompt('Motivo da reprovação (opcional):') || '';
+  if(!confirm('Confirma reprovar esta solicitação de troca?')) return;
+  try {
+    await updateDoc(doc(db,'swapRequests',s.id), {
+      status:'REPROVADA', decidedBy: currentUser.name, decidedAt: Date.now(), decisionNotes: notes,
+    });
+    toast('Troca reprovada.', 'ok');
+    closeModal('modalSwapApprovalDetail');
+  } catch(err){
+    toast('Erro ao reprovar troca: '+err.message, 'err');
+  }
+}
+
+document.getElementById('btnCancelAdjust').addEventListener('click', ()=>{
+  document.getElementById('saAdjustPanel').classList.add('hidden');
+});
+document.getElementById('btnConfirmAdjust').addEventListener('click', async ()=>{
+  const s = swapRequests.find(x=>x.id===currentSwapApprovalId);
+  if(!s) return;
+  const leg = document.getElementById('saAdjustLeg').value;
+  const note = document.getElementById('saAdjustNote').value.trim();
+  if(!note){ toast('Descreva o que precisa ser corrigido.', 'err'); return; }
+  const field = leg==='devolucao' ? 'returnInspectionId' : 'receiveInspectionId';
+  try {
+    await updateDoc(doc(db,'swapRequests',s.id), {
+      [field]: null, status:'AJUSTES',
+      decidedBy: currentUser.name, decidedAt: Date.now(),
+      decisionNotes: `Vistoria do veículo ${leg==='devolucao'?'devolvido':'recebido'}: ${note}`,
+    });
+    toast('Ajuste solicitado ao motorista.', 'ok');
+    closeModal('modalSwapApprovalDetail');
+  } catch(err){
+    toast('Erro ao solicitar ajuste: '+err.message, 'err');
+  }
+});
+
+async function notifyNewSwapApprovalRequest(s){
+  if(!(whatsappSettings.recipients||[]).length) return;
+  const link = `${location.origin}${location.pathname}#trocas/${s.id}`;
+  notifyWhatsApp(
+    `🔄 Nova solicitação de troca de veículo aguardando aprovação\n` +
+    `Motorista: ${s.driverName||driverName(s.driverId)}\n` +
+    `Veículo atual: ${s.fromPlate||'—'}\n` +
+    `Novo veículo: ${s.toPlate||'—'}\n` +
+    `Motivo: ${s.reason||'—'}\n` +
+    `Analisar: ${link}`
+  );
+  try { await updateDoc(doc(db,'swapRequests',s.id), {notifiedApproval:true}); }
+  catch(err){ console.error('Erro ao marcar solicitação como notificada:', err); }
+}
+
+function handleSwapDeepLink(){
+  if(swapDeepLinkHandled) return;
+  const m = location.hash.match(/^#trocas\/(.+)$/);
+  if(!m) return;
+  const s = swapRequests.find(x=>x.id===m[1]);
+  if(!s) return;
+  swapDeepLinkHandled = true;
+  switchView('trocas');
+  openSwapApprovalDetail(s.id);
 }
 
 function openTicketModalForMyVehicle(){
@@ -1882,22 +2518,25 @@ function toDatetimeLocal(date){
   return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function renderInspectionChecklistForm(){
-  document.getElementById('inspChecklist').innerHTML = CHECKLIST_ITEMS.map(item=>`
+function renderChecklistInto(containerId, prefix){
+  document.getElementById(containerId).innerHTML = CHECKLIST_ITEMS.map(item=>`
     <div class="chk-row">
       <div class="chk-label">${escapeHtml(item.label)}</div>
-      <select class="chk-select" id="chk_${item.key}">
+      <select class="chk-select" id="${prefix}chk_${item.key}">
         <option value="ok">OK</option>
         <option value="problema">Problema</option>
         <option value="na">N/A</option>
       </select>
-      <input type="text" class="chk-obs hidden" id="chkobs_${item.key}" placeholder="Descreva o problema encontrado…">
+      <input type="text" class="chk-obs hidden" id="${prefix}chkobs_${item.key}" placeholder="Descreva o problema encontrado…">
     </div>`).join('');
   CHECKLIST_ITEMS.forEach(item=>{
-    document.getElementById('chk_'+item.key).addEventListener('change', (e)=>{
-      document.getElementById('chkobs_'+item.key).classList.toggle('hidden', e.target.value!=='problema');
+    document.getElementById(prefix+'chk_'+item.key).addEventListener('change', (e)=>{
+      document.getElementById(prefix+'chkobs_'+item.key).classList.toggle('hidden', e.target.value!=='problema');
     });
   });
+}
+function renderInspectionChecklistForm(){
+  renderChecklistInto('inspChecklist', '');
 }
 
 function renderInspections(){
