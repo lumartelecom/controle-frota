@@ -286,6 +286,15 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 .empty-state{padding:48px 20px; text-align:center; color:var(--ink-muted);}
 .empty-state .ic{font-size:30px; margin-bottom:10px; opacity:.5;}
 
+/* ============ UPLOAD LOADING (envio de fotos) ============ */
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner{width:15px; height:15px; border:2px solid var(--border); border-top-color:var(--brand); border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0;}
+.upload-banner{display:flex; align-items:center; gap:10px; padding:10px 12px; background:var(--surface-alt); border:1px solid var(--border); border-radius:8px; font-size:13px; color:var(--ink-muted); margin-top:14px;}
+.upload-banner .bar-track{flex:1; height:6px; background:var(--border); border-radius:4px; overflow:hidden; position:relative;}
+.upload-banner .bar-track::after{content:''; position:absolute; top:0; left:-40%; width:40%; height:100%; background:var(--brand); border-radius:4px; animation:barSlide 1.1s ease-in-out infinite;}
+@keyframes barSlide{0%{left:-40%;} 100%{left:100%;}}
+.btn[disabled]{opacity:.65; cursor:not-allowed;}
+
 @media(max-width:860px){
   #sidebar{position:fixed; z-index:90; height:100vh; left:0; top:0; box-shadow:var(--shadow-md);}
   #sidebar:not(.collapsed){width:230px;}
@@ -857,6 +866,11 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
         </div>
         <div class="field full"><label>Foto (opcional)</label><input type="file" id="tkPhoto" accept="image/*"></div>
       </div>
+      <div class="upload-banner hidden" id="tkUploadingBanner">
+        <span class="spinner"></span>
+        <span>Enviando foto e registrando a O.S., aguarde…</span>
+        <div class="bar-track"></div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" data-close="modalTicket">Cancelar</button>
@@ -1060,6 +1074,11 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
         </div>
 
         <div class="field full"><label>Observações gerais</label><textarea id="swInspObservations" rows="3" style="width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--ink);"></textarea></div>
+      </div>
+      <div class="upload-banner hidden" id="swInspUploadingBanner">
+        <span class="spinner"></span>
+        <span>Enviando fotos e registrando a vistoria, aguarde…</span>
+        <div class="bar-track"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -1749,41 +1768,44 @@ function openSwapInspectionModal(s, leg){
 }
 
 document.getElementById('btnSaveSwapInspection').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnSaveSwapInspection');
+  if(btn.disabled) return;
   if(!currentSwapLeg) return;
   const kmRaw = document.getElementById('swInspKm').value;
   if(!kmRaw){ toast('Informe a quilometragem.', 'err'); return; }
-  const km = Number(kmRaw);
-  const observations = document.getElementById('swInspObservations').value.trim();
-  const checklist = [];
-  let hasProblem = false;
-  CHECKLIST_ITEMS.forEach(item=>{
-    const status = document.getElementById('swchk_'+item.key).value;
-    const obs = document.getElementById('swchkobs_'+item.key).value.trim();
-    if(status==='problema') hasProblem = true;
-    checklist.push({...item, status, obs});
-  });
-  const result = hasProblem ? 'RESSALVAS' : 'APROVADO';
-
-  const { swapRequestId, leg, vehicleId, plate } = currentSwapLeg;
-  const subfolder = driveVehicleFolder('VISTORIAS', plate, currentUser.name);
-  const photoSlotIds = {frente:'swInspPhotoFrente', traseira:'swInspPhotoTraseira', lateralEsq:'swInspPhotoLatEsq', lateralDir:'swInspPhotoLatDir', painel:'swInspPhotoPainel', interior:'swInspPhotoInterior'};
-  const photos = {};
-  for(const [key, id] of Object.entries(photoSlotIds)){
-    const file = document.getElementById(id).files[0];
-    if(file) photos[key] = await processPhoto(file, subfolder);
-  }
-  const driveTextFileId = await uploadTextToDrive(
-    `VISTORIA DE TROCA (${leg==='devolucao'?'veículo devolvido':'veículo recebido'}) — ${plate}\n\n` +
-    `Motorista: ${currentUser.name}\n` +
-    `KM: ${km}\n` +
-    `Resultado: ${RESULT_LABEL[result]}\n` +
-    `Data: ${fmtDate(Date.now())}\n\n` +
-    `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
-    `Observações:\n${observations || '—'}\n`,
-    `${new Date().toISOString().slice(0,10)}_vistoria_troca_${leg}.txt`, subfolder
-  );
-
+  setBtnLoading('btnSaveSwapInspection', true, 'Enviando…', 'swInspUploadingBanner');
   try {
+    const km = Number(kmRaw);
+    const observations = document.getElementById('swInspObservations').value.trim();
+    const checklist = [];
+    let hasProblem = false;
+    CHECKLIST_ITEMS.forEach(item=>{
+      const status = document.getElementById('swchk_'+item.key).value;
+      const obs = document.getElementById('swchkobs_'+item.key).value.trim();
+      if(status==='problema') hasProblem = true;
+      checklist.push({...item, status, obs});
+    });
+    const result = hasProblem ? 'RESSALVAS' : 'APROVADO';
+
+    const { swapRequestId, leg, vehicleId, plate } = currentSwapLeg;
+    const subfolder = driveVehicleFolder('VISTORIAS', plate, currentUser.name);
+    const photoSlotIds = {frente:'swInspPhotoFrente', traseira:'swInspPhotoTraseira', lateralEsq:'swInspPhotoLatEsq', lateralDir:'swInspPhotoLatDir', painel:'swInspPhotoPainel', interior:'swInspPhotoInterior'};
+    const photos = {};
+    for(const [key, id] of Object.entries(photoSlotIds)){
+      const file = document.getElementById(id).files[0];
+      if(file) photos[key] = await processPhoto(file, subfolder);
+    }
+    const driveTextFileId = await uploadTextToDrive(
+      `VISTORIA DE TROCA (${leg==='devolucao'?'veículo devolvido':'veículo recebido'}) — ${plate}\n\n` +
+      `Motorista: ${currentUser.name}\n` +
+      `KM: ${km}\n` +
+      `Resultado: ${RESULT_LABEL[result]}\n` +
+      `Data: ${fmtDate(Date.now())}\n\n` +
+      `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
+      `Observações:\n${observations || '—'}\n`,
+      `${new Date().toISOString().slice(0,10)}_vistoria_troca_${leg}.txt`, subfolder
+    );
+
     const inspRef = await addDoc(collection(db,'inspections'), {
       vehicleId, vehiclePlate: plate, driverId: currentUser.driverId, km, result, checklist, photos,
       extraPhotos:[], observations, driveTextFileId,
@@ -1805,6 +1827,8 @@ document.getElementById('btnSaveSwapInspection').addEventListener('click', async
     currentSwapLeg = null;
   } catch(err){
     toast('Erro ao salvar vistoria: '+err.message, 'err');
+  } finally {
+    setBtnLoading('btnSaveSwapInspection', false, null, 'swInspUploadingBanner');
   }
 });
 
@@ -1971,11 +1995,17 @@ async function notifyNewSwapApprovalRequest(s){
   console.log('[WhatsApp] notifyNewSwapApprovalRequest chamado para', s.id, '— total de destinatários:', (whatsappSettings.recipients||[]).length);
   if(!(whatsappSettings.recipients||[]).length) return;
   const link = `${location.origin}${location.pathname}#trocas/${s.id}`;
+  const fromVehicle = vehicles.find(v=>v.id===s.fromVehicleId);
+  const toVehicle = vehicles.find(v=>v.id===s.toVehicleId);
+  const fromModelText = fromVehicle ? ((fromVehicle.brand?fromVehicle.brand+' ':'')+(fromVehicle.model||'')).trim() : '';
+  const toModelText = toVehicle ? ((toVehicle.brand?toVehicle.brand+' ':'')+(toVehicle.model||'')).trim() : '';
+  const fromLine = fromModelText ? `${s.fromPlate||'—'} — ${fromModelText}` : (s.fromPlate||'—');
+  const toLine = toModelText ? `${s.toPlate||'—'} — ${toModelText}` : (s.toPlate||'—');
   notifyWhatsApp(
     `🔄 Nova solicitação de troca de veículo aguardando aprovação\n` +
     `Motorista: ${s.driverName||driverName(s.driverId)}\n` +
-    `Veículo atual: ${s.fromPlate||'—'}\n` +
-    `Novo veículo: ${s.toPlate||'—'}\n` +
+    `Veículo atual: ${fromLine}\n` +
+    `Novo veículo: ${toLine}\n` +
     `Motivo: ${s.reason||'—'}\n` +
     `Analisar: ${link}`
   );
@@ -2263,23 +2293,26 @@ function openVehicleDetail(id){
 window.openVehicleDetail = openVehicleDetail;
 
 document.getElementById('btnSaveVehicle').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnSaveVehicle');
+  if(btn.disabled) return;
   const id = document.getElementById('vhId').value;
   const plate = document.getElementById('vhPlate').value.trim().toUpperCase();
   const model = document.getElementById('vhModel').value.trim();
   if(!plate || !model){ toast('Placa e modelo são obrigatórios.', 'err'); return; }
-  const payload = {
-    plate, model,
-    brand: document.getElementById('vhBrand').value.trim(),
-    year: Number(document.getElementById('vhYear').value) || null,
-    km: Number(document.getElementById('vhKm').value) || 0,
-    fleet: document.getElementById('vhFleet').value,
-    status: document.getElementById('vhStatus').value,
-    driverId: document.getElementById('vhDriver').value || null,
-    costCenter: document.getElementById('vhCostCenter').value.trim(),
-  };
-  const file = document.getElementById('vhPhoto').files[0];
-  if(file) payload.photoURL = await processPhoto(file, 'veiculos');
+  setBtnLoading('btnSaveVehicle', true, 'Enviando…');
   try {
+    const payload = {
+      plate, model,
+      brand: document.getElementById('vhBrand').value.trim(),
+      year: Number(document.getElementById('vhYear').value) || null,
+      km: Number(document.getElementById('vhKm').value) || 0,
+      fleet: document.getElementById('vhFleet').value,
+      status: document.getElementById('vhStatus').value,
+      driverId: document.getElementById('vhDriver').value || null,
+      costCenter: document.getElementById('vhCostCenter').value.trim(),
+    };
+    const file = document.getElementById('vhPhoto').files[0];
+    if(file) payload.photoURL = await processPhoto(file, 'veiculos');
     if(id){
       await updateDoc(doc(db,'vehicles',id), payload);
     } else {
@@ -2290,6 +2323,8 @@ document.getElementById('btnSaveVehicle').addEventListener('click', async ()=>{
     closeModal('modalVehicle');
   } catch(err){
     toast('Erro ao salvar veículo: '+err.message, 'err');
+  } finally {
+    setBtnLoading('btnSaveVehicle', false);
   }
 });
 
@@ -2596,95 +2631,100 @@ document.getElementById('btnNewInspection').addEventListener('click', ()=>{
 });
 
 document.getElementById('btnSaveInspection').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnSaveInspection');
+  if(btn.disabled) return;
   const vehicleId = document.getElementById('inspVehicle').value;
   const driverId = document.getElementById('inspDriverId').value;
   const kmRaw = document.getElementById('inspKm').value;
   if(!vehicleId || !driverId || !kmRaw){ toast('Selecione o veículo, o condutor e informe a quilometragem.', 'err'); return; }
-  const vehicle = vehicles.find(v=>v.id===vehicleId);
-  const km = Number(kmRaw);
-  const dateVal = document.getElementById('inspDate').value;
-  const performedAt = dateVal ? new Date(dateVal).getTime() : Date.now();
-  const retido = document.getElementById('inspRetido').checked;
-  const autoTicket = document.getElementById('inspAutoTicket').checked;
-  const observations = document.getElementById('inspObservations').value.trim();
-
-  const checklist = [];
-  let hasProblem = false;
-  CHECKLIST_ITEMS.forEach(item=>{
-    const status = document.getElementById('chk_'+item.key).value;
-    const obs = document.getElementById('chkobs_'+item.key).value.trim();
-    if(status==='problema') hasProblem = true;
-    checklist.push({...item, status, obs});
-  });
-  let result = 'APROVADO';
-  if(retido) result = 'REPROVADO';
-  else if(hasProblem) result = 'RESSALVAS';
-
-  const inspDriverLabel = driverName(driverId);
-  const inspSubfolder = driveVehicleFolder('VISTORIAS', vehicle?.plate, inspDriverLabel);
-
-  const photoSlotIds = {frente:'inspPhotoFrente', traseira:'inspPhotoTraseira', lateralEsq:'inspPhotoLatEsq', lateralDir:'inspPhotoLatDir', painel:'inspPhotoPainel'};
-  const photos = {};
-  for(const [key, id] of Object.entries(photoSlotIds)){
-    const file = document.getElementById(id).files[0];
-    if(file) photos[key] = await processPhoto(file, inspSubfolder);
-  }
-  const extraFiles = Array.from(document.getElementById('inspExtraPhotos').files || []);
-  const extraPhotos = await Promise.all(extraFiles.map(f=>processPhoto(f, inspSubfolder)));
-
-  const inspTextFileId = await uploadTextToDrive(
-    `VISTORIA — ${vehicle?.plate||'—'}\n\n` +
-    `Veículo: ${vehicle?.plate||'—'} — ${(vehicle?.brand?vehicle.brand+' ':'')+(vehicle?.model||'')}\n` +
-    `Motorista/condutor: ${inspDriverLabel}\n` +
-    `KM na vistoria: ${km}\n` +
-    `Resultado: ${RESULT_LABEL[result]}\n` +
-    `Realizada por: ${currentUser.name}\n` +
-    `Data: ${fmtDate(performedAt)}\n\n` +
-    `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
-    `Observações gerais:\n${observations || '—'}\n`,
-    `${new Date(performedAt).toISOString().slice(0,10)}_vistoria.txt`, inspSubfolder
-  );
-
-  const inspectionRef = doc(collection(db,'inspections'));
-  const generatedTickets = [];
-  const batch = writeBatch(db);
-  let ticketSeq = tickets.length;
-
-  if(autoTicket){
-    checklist.forEach(entry=>{
-      if(entry.status==='problema' && entry.category){
-        ticketSeq++;
-        const ticketNumber = `FRT-${new Date().getFullYear()}-${String(ticketSeq).padStart(6,'0')}`;
-        batch.set(doc(collection(db,'tickets')), {
-          ticketNumber, vehicleId, vehiclePlate: vehicle?.plate || '—',
-          description: `Item reprovado na vistoria de ${fmtDate(performedAt)}, condutor ${driverName(driverId)}: ${entry.label}.${entry.obs ? ' Obs.: '+entry.obs : ''}`,
-          priority: retido ? 'CRITICA' : 'ALTA', status:'NOVO', km, location:'', parado:retido, photoURL:null,
-          openedByUid: currentUser.uid, openedByName: currentUser.name,
-          createdAt:Date.now(), updatedAt:Date.now(), fromInspectionId: inspectionRef.id
-        });
-        generatedTickets.push(ticketNumber);
-      }
-    });
-  }
-
-  batch.set(inspectionRef, {
-    vehicleId, vehiclePlate: vehicle?.plate || '—',
-    driverId, km, retido, result, observations,
-    checklist, photos, extraPhotos, driveTextFileId: inspTextFileId,
-    createdBy: currentUser.name, createdAt: performedAt,
-    generatedTickets
-  });
-
-  if(result==='REPROVADO' && vehicle && vehicle.status!=='em-manutencao'){
-    batch.update(doc(db,'vehicles',vehicleId), {status:'em-manutencao'});
-  }
-
+  setBtnLoading('btnSaveInspection', true, 'Enviando…');
   try {
+    const vehicle = vehicles.find(v=>v.id===vehicleId);
+    const km = Number(kmRaw);
+    const dateVal = document.getElementById('inspDate').value;
+    const performedAt = dateVal ? new Date(dateVal).getTime() : Date.now();
+    const retido = document.getElementById('inspRetido').checked;
+    const autoTicket = document.getElementById('inspAutoTicket').checked;
+    const observations = document.getElementById('inspObservations').value.trim();
+
+    const checklist = [];
+    let hasProblem = false;
+    CHECKLIST_ITEMS.forEach(item=>{
+      const status = document.getElementById('chk_'+item.key).value;
+      const obs = document.getElementById('chkobs_'+item.key).value.trim();
+      if(status==='problema') hasProblem = true;
+      checklist.push({...item, status, obs});
+    });
+    let result = 'APROVADO';
+    if(retido) result = 'REPROVADO';
+    else if(hasProblem) result = 'RESSALVAS';
+
+    const inspDriverLabel = driverName(driverId);
+    const inspSubfolder = driveVehicleFolder('VISTORIAS', vehicle?.plate, inspDriverLabel);
+
+    const photoSlotIds = {frente:'inspPhotoFrente', traseira:'inspPhotoTraseira', lateralEsq:'inspPhotoLatEsq', lateralDir:'inspPhotoLatDir', painel:'inspPhotoPainel'};
+    const photos = {};
+    for(const [key, id] of Object.entries(photoSlotIds)){
+      const file = document.getElementById(id).files[0];
+      if(file) photos[key] = await processPhoto(file, inspSubfolder);
+    }
+    const extraFiles = Array.from(document.getElementById('inspExtraPhotos').files || []);
+    const extraPhotos = await Promise.all(extraFiles.map(f=>processPhoto(f, inspSubfolder)));
+
+    const inspTextFileId = await uploadTextToDrive(
+      `VISTORIA — ${vehicle?.plate||'—'}\n\n` +
+      `Veículo: ${vehicle?.plate||'—'} — ${(vehicle?.brand?vehicle.brand+' ':'')+(vehicle?.model||'')}\n` +
+      `Motorista/condutor: ${inspDriverLabel}\n` +
+      `KM na vistoria: ${km}\n` +
+      `Resultado: ${RESULT_LABEL[result]}\n` +
+      `Realizada por: ${currentUser.name}\n` +
+      `Data: ${fmtDate(performedAt)}\n\n` +
+      `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
+      `Observações gerais:\n${observations || '—'}\n`,
+      `${new Date(performedAt).toISOString().slice(0,10)}_vistoria.txt`, inspSubfolder
+    );
+
+    const inspectionRef = doc(collection(db,'inspections'));
+    const generatedTickets = [];
+    const batch = writeBatch(db);
+    let ticketSeq = tickets.length;
+
+    if(autoTicket){
+      checklist.forEach(entry=>{
+        if(entry.status==='problema' && entry.category){
+          ticketSeq++;
+          const ticketNumber = `FRT-${new Date().getFullYear()}-${String(ticketSeq).padStart(6,'0')}`;
+          batch.set(doc(collection(db,'tickets')), {
+            ticketNumber, vehicleId, vehiclePlate: vehicle?.plate || '—',
+            description: `Item reprovado na vistoria de ${fmtDate(performedAt)}, condutor ${driverName(driverId)}: ${entry.label}.${entry.obs ? ' Obs.: '+entry.obs : ''}`,
+            priority: retido ? 'CRITICA' : 'ALTA', status:'NOVO', km, location:'', parado:retido, photoURL:null,
+            openedByUid: currentUser.uid, openedByName: currentUser.name,
+            createdAt:Date.now(), updatedAt:Date.now(), fromInspectionId: inspectionRef.id
+          });
+          generatedTickets.push(ticketNumber);
+        }
+      });
+    }
+
+    batch.set(inspectionRef, {
+      vehicleId, vehiclePlate: vehicle?.plate || '—',
+      driverId, km, retido, result, observations,
+      checklist, photos, extraPhotos, driveTextFileId: inspTextFileId,
+      createdBy: currentUser.name, createdAt: performedAt,
+      generatedTickets
+    });
+
+    if(result==='REPROVADO' && vehicle && vehicle.status!=='em-manutencao'){
+      batch.update(doc(db,'vehicles',vehicleId), {status:'em-manutencao'});
+    }
+
     await batch.commit();
     toast(`Vistoria registrada — resultado: ${RESULT_LABEL[result]}.` + (generatedTickets.length ? ` ${generatedTickets.length} O.S. gerada(s) automaticamente.` : ''), result==='REPROVADO' ? 'err' : 'ok');
     closeModal('modalInspection');
   } catch(err){
     toast('Erro ao salvar vistoria: '+err.message, 'err');
+  } finally {
+    setBtnLoading('btnSaveInspection', false);
   }
 });
 
@@ -2793,33 +2833,36 @@ function nextTicketNumber(){
 }
 
 document.getElementById('btnSaveTicket').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnSaveTicket');
+  if(btn.disabled) return; // já está enviando, ignora clique duplicado
   const vehicleId = document.getElementById('tkVehicle').value;
   const description = document.getElementById('tkDescription').value.trim();
   if(!vehicleId || !description){ toast('Selecione o veículo e descreva o serviço.', 'err'); return; }
-  const vehicle = vehicles.find(v=>v.id===vehicleId) || myVehicle;
-  const parado = document.getElementById('tkParado').checked;
-  const priority = parado ? 'CRITICA' : document.getElementById('tkPriority').value;
-  const ticketNumber = nextTicketNumber();
-  const location = document.getElementById('tkLocation').value.trim();
-  const km = Number(document.getElementById('tkKm').value) || null;
-  const driverLabel = vehicle?.driverId ? driverName(vehicle.driverId) : 'Sem motorista';
-  const subfolder = driveVehicleFolder('ORDEM DE SERVIÇO', vehicle?.plate, driverLabel);
-  let photoURL = null;
-  const file = document.getElementById('tkPhoto').files[0];
-  if(file) photoURL = await processPhoto(file, subfolder);
-  const driveTextFileId = await uploadTextToDrive(
-    `ORDEM DE SERVIÇO — ${ticketNumber}\n\n` +
-    `Veículo: ${vehicle?.plate||'—'} — ${(vehicle?.brand?vehicle.brand+' ':'')+(vehicle?.model||'')}\n` +
-    `Motorista: ${driverLabel}\n` +
-    `Prioridade: ${PRIORITY_LABEL[priority]}\n` +
-    `Localização: ${location||'—'}\n` +
-    `KM no momento: ${km||'—'}\n` +
-    `Aberto por: ${currentUser.name}\n` +
-    `Data de abertura: ${fmtDate(Date.now())}\n\n` +
-    `Descrição do serviço solicitado:\n${description}\n`,
-    `${ticketNumber}_solicitacao.txt`, subfolder
-  );
+  setBtnLoading('btnSaveTicket', true, 'Enviando…', 'tkUploadingBanner');
   try {
+    const vehicle = vehicles.find(v=>v.id===vehicleId) || myVehicle;
+    const parado = document.getElementById('tkParado').checked;
+    const priority = parado ? 'CRITICA' : document.getElementById('tkPriority').value;
+    const ticketNumber = nextTicketNumber();
+    const location = document.getElementById('tkLocation').value.trim();
+    const km = Number(document.getElementById('tkKm').value) || null;
+    const driverLabel = vehicle?.driverId ? driverName(vehicle.driverId) : 'Sem motorista';
+    const subfolder = driveVehicleFolder('ORDEM DE SERVIÇO', vehicle?.plate, driverLabel);
+    let photoURL = null;
+    const file = document.getElementById('tkPhoto').files[0];
+    if(file) photoURL = await processPhoto(file, subfolder);
+    const driveTextFileId = await uploadTextToDrive(
+      `ORDEM DE SERVIÇO — ${ticketNumber}\n\n` +
+      `Veículo: ${vehicle?.plate||'—'} — ${(vehicle?.brand?vehicle.brand+' ':'')+(vehicle?.model||'')}\n` +
+      `Motorista: ${driverLabel}\n` +
+      `Prioridade: ${PRIORITY_LABEL[priority]}\n` +
+      `Localização: ${location||'—'}\n` +
+      `KM no momento: ${km||'—'}\n` +
+      `Aberto por: ${currentUser.name}\n` +
+      `Data de abertura: ${fmtDate(Date.now())}\n\n` +
+      `Descrição do serviço solicitado:\n${description}\n`,
+      `${ticketNumber}_solicitacao.txt`, subfolder
+    );
     await addDoc(collection(db,'tickets'), {
       ticketNumber, vehicleId, vehiclePlate: vehicle?.plate || '—',
       description, priority, status:'NOVO',
@@ -2832,6 +2875,8 @@ document.getElementById('btnSaveTicket').addEventListener('click', async ()=>{
     closeModal('modalTicket');
   } catch(err){
     toast('Erro ao abrir O.S.: '+err.message, 'err');
+  } finally {
+    setBtnLoading('btnSaveTicket', false, null, 'tkUploadingBanner');
   }
 });
 
@@ -2920,27 +2965,29 @@ function openTicketCloseModal(id){
 window.openTicketCloseModal = openTicketCloseModal;
 
 document.getElementById('btnConfirmCloseTicket').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnConfirmCloseTicket');
+  if(btn.disabled) return;
   const id = document.getElementById('modalTicketClose').dataset.ticketId;
   const t = tickets.find(x=>x.id===id);
   if(!t) return;
   const closingDescription = document.getElementById('tcDescription').value.trim();
   if(!closingDescription){ toast('Descreva o serviço executado.', 'err'); return; }
-  const closeVehicle = vehicles.find(v=>v.id===t.vehicleId);
-  const closeDriverLabel = closeVehicle?.driverId ? driverName(closeVehicle.driverId) : 'Sem motorista';
-  const closeSubfolder = driveVehicleFolder('ORDEM DE SERVIÇO', t.vehiclePlate, closeDriverLabel);
-  const files = Array.from(document.getElementById('tcPhotos').files || []);
-  const closingPhotos = await Promise.all(files.map(f=>processPhoto(f, closeSubfolder)));
-  const closingTextFileId = await uploadTextToDrive(
-    `ORDEM DE SERVIÇO — ${t.ticketNumber} (fechamento)\n\n` +
-    `Veículo: ${t.vehiclePlate||'—'}\n` +
-    `Motorista: ${closeDriverLabel}\n` +
-    `Fechada por: ${currentUser.name}\n` +
-    `Data de fechamento: ${fmtDate(Date.now())}\n\n` +
-    `Serviço executado:\n${closingDescription}\n`,
-    `${t.ticketNumber}_fechamento.txt`, closeSubfolder
-  );
-
+  setBtnLoading('btnConfirmCloseTicket', true, 'Enviando…');
   try {
+    const closeVehicle = vehicles.find(v=>v.id===t.vehicleId);
+    const closeDriverLabel = closeVehicle?.driverId ? driverName(closeVehicle.driverId) : 'Sem motorista';
+    const closeSubfolder = driveVehicleFolder('ORDEM DE SERVIÇO', t.vehiclePlate, closeDriverLabel);
+    const files = Array.from(document.getElementById('tcPhotos').files || []);
+    const closingPhotos = await Promise.all(files.map(f=>processPhoto(f, closeSubfolder)));
+    const closingTextFileId = await uploadTextToDrive(
+      `ORDEM DE SERVIÇO — ${t.ticketNumber} (fechamento)\n\n` +
+      `Veículo: ${t.vehiclePlate||'—'}\n` +
+      `Motorista: ${closeDriverLabel}\n` +
+      `Fechada por: ${currentUser.name}\n` +
+      `Data de fechamento: ${fmtDate(Date.now())}\n\n` +
+      `Serviço executado:\n${closingDescription}\n`,
+      `${t.ticketNumber}_fechamento.txt`, closeSubfolder
+    );
     await updateDoc(doc(db,'tickets',id), {
       status: 'CONCLUIDO',
       closingDescription,
@@ -2955,6 +3002,8 @@ document.getElementById('btnConfirmCloseTicket').addEventListener('click', async
     openTicketDetail(id);
   } catch(err){
     toast('Erro ao fechar O.S.: '+err.message, 'err');
+  } finally {
+    setBtnLoading('btnConfirmCloseTicket', false);
   }
 });
 
@@ -3285,6 +3334,25 @@ async function deleteDriveFiles(fileIdsOrUrls){
 
 function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
+
+// Trava o botão de salvar (evita duplo clique enquanto sobe foto pro Drive) e,
+// se houver um banner de upload correspondente no modal, mostra/esconde ele também.
+function setBtnLoading(btnId, loading, loadingText, bannerId){
+  const btn = document.getElementById(btnId);
+  if(!btn) return;
+  if(loading){
+    btn.dataset.originalText = btn.textContent;
+    btn.disabled = true;
+    if(loadingText) btn.textContent = loadingText;
+  } else {
+    btn.disabled = false;
+    if(btn.dataset.originalText) btn.textContent = btn.dataset.originalText;
+  }
+  if(bannerId){
+    const banner = document.getElementById(bannerId);
+    if(banner) banner.classList.toggle('hidden', !loading);
+  }
+}
 document.querySelectorAll('[data-close]').forEach(btn=>{
   btn.addEventListener('click', ()=>closeModal(btn.dataset.close));
 });
