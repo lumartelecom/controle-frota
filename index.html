@@ -15,7 +15,7 @@
   --st-critica:#E30613; --st-alta:#F2994A; --st-media:#2F80ED; --st-baixa:#6FCF97;
   --st-novo:#5B6270; --st-analise:#2F80ED; --st-manutencao:#9B51E0; --st-concluido:#27AE60;
   --shadow-sm:0 1px 2px rgba(20,22,28,.06); --shadow-md:0 8px 24px rgba(20,22,28,.10);
-  --radius:10px;
+  --radius:12px;
 }
 :root[data-theme="dark"]{
   --bg:#0A1120; --surface:#111B2E; --surface-alt:#0D1626; --border:#1E2B45;
@@ -24,6 +24,7 @@
   --st-critica:#F2543D; --st-alta:#F97316; --st-media:#38BDF8; --st-baixa:#34D399;
   --st-novo:#8B96AC; --st-analise:#38BDF8; --st-manutencao:#A78BFA; --st-concluido:#34D399;
   --shadow-sm:0 1px 2px rgba(0,0,0,.4); --shadow-md:0 8px 28px rgba(0,0,0,.55);
+  --radius:12px;
 }
 *{box-sizing:border-box; margin:0; padding:0;}
 body{font-family:'IBM Plex Sans',system-ui,sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased;}
@@ -59,14 +60,14 @@ a{color:inherit;}
 .field input:focus, .field select:focus{border-color:var(--brand);}
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:8px;
-  padding:11px 18px; border-radius:8px; border:none; font-weight:600; font-size:14px;
-  transition:transform .08s, opacity .15s;
+  padding:11px 18px; border-radius:9px; border:none; font-weight:600; font-size:14px;
+  transition:transform .12s cubic-bezier(.2,.8,.2,1), opacity .15s, box-shadow .15s ease, background-color .15s ease, border-color .15s ease;
 }
-.btn:active{transform:scale(.98);}
-.btn-primary{background:var(--brand); color:var(--brand-ink); width:100%;}
-.btn-primary:hover{background:var(--brand-dark);}
+.btn:active{transform:scale(.97);}
+.btn-primary{background:var(--brand); color:var(--brand-ink); width:100%; box-shadow:0 1px 2px rgba(0,0,0,.08);}
+.btn-primary:hover{background:var(--brand-dark); box-shadow:var(--shadow-sm); transform:translateY(-1px);}
 .btn-ghost{background:transparent; color:var(--ink-muted); border:1.5px solid var(--border);}
-.btn-ghost:hover{border-color:var(--ink-faint);}
+.btn-ghost:hover{border-color:var(--ink-faint); color:var(--ink); background:var(--surface-alt);}
 .btn-danger{background:transparent; color:var(--st-critica); border:1.5px solid var(--st-critica);}
 .btn-danger:hover{background:var(--st-critica); color:#fff;}
 .login-row{display:flex; justify-content:space-between; align-items:center; margin:14px 0 22px; font-size:13px;}
@@ -90,11 +91,12 @@ a{color:inherit;}
 #sidebar.collapsed .sb-label{display:none;}
 .sb-nav{flex:1; padding:12px 10px; overflow-y:auto;}
 .sb-item{
-  display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:8px;
+  display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:9px;
   color:var(--ink-muted); font-size:13.5px; font-weight:500; margin-bottom:2px; border:none; background:none; width:100%; text-align:left;
+  transition:background-color .12s ease, color .12s ease;
 }
 .sb-item:hover{background:var(--surface-alt); color:var(--ink);}
-.sb-item.active{background:var(--brand); color:#fff;}
+.sb-item.active{background:var(--brand); color:var(--brand-ink);}
 .sb-item .ic{width:18px; text-align:center; flex-shrink:0;}
 .sb-foot{padding:12px; border-top:1px solid var(--border);}
 .main-wrap{flex:1; display:flex; flex-direction:column; min-width:0;}
@@ -115,23 +117,24 @@ a{color:inherit;}
 #content{flex:1; overflow-y:auto; padding:24px;}
 
 /* ============ CARDS / KPI ============ */
-.kpi-grid{display:flex; flex-wrap:nowrap; gap:10px; margin-bottom:24px; overflow-x:auto; padding-bottom:2px;}
+.kpi-grid{display:flex; flex-wrap:nowrap; gap:14px; margin-bottom:28px; overflow-x:auto; padding-bottom:2px;}
 .kpi-card{
-  background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent, var(--border));
-  border-radius:var(--radius); padding:11px 14px; box-shadow:var(--shadow-sm); flex:1 1 0; min-width:0; text-align:left;
-  cursor:pointer; transition:transform .1s ease, box-shadow .15s ease;
+  background:var(--surface); border:1px solid var(--border); border-top:3px solid var(--accent, var(--border));
+  border-radius:14px; padding:16px 18px; box-shadow:var(--shadow-sm); flex:1 1 0; min-width:0; text-align:left;
+  cursor:pointer; transition:transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s ease, border-color .18s ease;
 }
-.kpi-card:hover{box-shadow:var(--shadow-md); transform:translateY(-2px);}
-.kpi-card:active{transform:translateY(0) scale(.98);}
-.kpi-card .val{font-size:20px; font-weight:700; font-family:'IBM Plex Mono',monospace; line-height:1.1; color:var(--accent, var(--ink));}
-.kpi-card .lbl{font-size:11px; color:var(--ink-muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.kpi-card:hover{box-shadow:var(--shadow-md); transform:translateY(-3px);}
+.kpi-card:active{transform:translateY(-1px) scale(.98); transition-duration:.05s;}
+.kpi-card .kpi-ic{font-size:18px; opacity:.85; margin-bottom:8px;}
+.kpi-card .val{font-size:28px; font-weight:700; font-family:'IBM Plex Mono',monospace; line-height:1.1; color:var(--accent, var(--ink)); letter-spacing:-.02em;}
+.kpi-card .lbl{font-size:11.5px; color:var(--ink-muted); margin-top:5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 
 .panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden;}
-.panel-head{display:flex; align-items:center; justify-content:between; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border);}
-.panel-head h3{font-size:15px; font-weight:700;}
-.section-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px;}
-.section-head h2{font-size:19px; font-weight:700; letter-spacing:-.2px;}
-.section-head .desc{font-size:13px; color:var(--ink-muted); margin-top:2px;}
+.panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border);}
+.panel-head h3{font-size:14.5px; font-weight:700; letter-spacing:-.1px;}
+.section-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;}
+.section-head h2{font-size:21px; font-weight:700; letter-spacing:-.3px;}
+.section-head .desc{font-size:13px; color:var(--ink-muted); margin-top:3px;}
 
 /* ============ FLEET OVERVIEW (Dashboard) ============ */
 .fleet-overview{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:0;}
@@ -146,13 +149,36 @@ a{color:inherit;}
 .fleet-veh-model{font-size:12.5px; color:var(--ink-muted); flex:1;}
 @media(max-width:760px){.fleet-col{border-right:none; border-bottom:1px solid var(--border);} .fleet-col:last-child{border-bottom:none;}}
 
+/* ============ DASHBOARD CHARTS ============ */
+.charts-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;}
+.chart-body{padding:18px 20px; min-height:150px; display:flex; flex-direction:column; justify-content:center;}
+.bar-row{display:flex; align-items:center; gap:10px; margin-bottom:11px;}
+.bar-row:last-child{margin-bottom:0;}
+.bar-row .bar-label{width:112px; flex-shrink:0; color:var(--ink-muted); font-weight:600; text-transform:uppercase; font-size:10.5px; letter-spacing:.03em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.bar-row .bar-track{flex:1; height:10px; background:var(--surface-alt); border-radius:6px; overflow:hidden;}
+.bar-row .bar-fill{height:100%; border-radius:6px; transition:width .5s cubic-bezier(.2,.8,.2,1);}
+.bar-row .bar-count{width:26px; text-align:right; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:13px; color:var(--ink);}
+.donut-wrap{display:flex; align-items:center; justify-content:center; gap:22px; flex-wrap:wrap;}
+.donut-legend-item{display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12.5px;}
+.donut-legend-item:last-child{margin-bottom:0;}
+.donut-legend-dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+
 /* ============ TABLE ============ */
 table{width:100%; border-collapse:collapse; font-size:13.5px;}
-th{text-align:left; padding:10px 16px; color:var(--ink-muted); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid var(--border); background:var(--surface-alt);}
-td{padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:middle;}
+th{text-align:left; padding:12px 16px; color:var(--ink-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid var(--border); background:var(--surface-alt);}
+td{padding:13px 16px; border-bottom:1px solid var(--border); vertical-align:middle; transition:background-color .1s ease;}
 tr:last-child td{border-bottom:none;}
-tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
+tbody tr:nth-child(even) td{background:color-mix(in srgb, var(--surface-alt) 55%, transparent);}
+tr.row-click{transition:background-color .12s ease;}
+tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 .plate{font-family:'IBM Plex Mono',monospace; font-weight:600; background:var(--surface-alt); padding:3px 8px; border-radius:5px; border:1px solid var(--border); letter-spacing:.03em;}
+.table-scroll{overflow-x:auto; overflow-y:auto; max-height:560px;}
+.table-scroll th{position:sticky; top:0; z-index:1;}
+.th-sortable{cursor:pointer; user-select:none; white-space:nowrap;}
+.th-sortable:hover{color:var(--ink);}
+.th-sortable .arrow{opacity:.7; font-size:9px; margin-left:3px;}
+.pagination-bar{display:flex; align-items:center; justify-content:center; gap:12px; padding:12px 16px; border-top:1px solid var(--border);}
+.pagination-bar span{font-size:12.5px; color:var(--ink-muted);}
 
 /* ============ BADGES ============ */
 .badge{display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:600;}
@@ -262,8 +288,9 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
   #sidebar.collapsed{width:0; overflow:hidden; border:none; box-shadow:none;}
   /* o topbar precisa ficar ACIMA da sidebar fixa, senão o botão ☰ fica escondido atrás dela */
   #topbar{position:relative; z-index:95;}
-  .kpi-card{padding:9px 11px;}
-  .kpi-card .val{font-size:17px;}
+  .kpi-card{padding:12px 14px;}
+  .kpi-card .kpi-ic{font-size:15px; margin-bottom:5px;}
+  .kpi-card .val{font-size:21px;}
   .kpi-card .lbl{font-size:10px;}
 }
 
@@ -371,6 +398,21 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
           <div class="fleet-overview" id="fleetOverview"></div>
         </div>
 
+        <div class="charts-grid" style="margin-bottom:24px;">
+          <div class="panel">
+            <div class="panel-head"><h3>Abertas x Concluídas</h3></div>
+            <div class="chart-body" id="chartOpenClosed"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Por Prioridade</h3></div>
+            <div class="chart-body" id="chartByPriority"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Por Status</h3></div>
+            <div class="chart-body" id="chartByStatus"></div>
+          </div>
+        </div>
+
         <div class="panel">
           <div class="panel-head"><h3>Últimas ordens de serviço</h3></div>
           <div id="dashRecentTickets"></div>
@@ -416,14 +458,13 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
           </div>
         </div>
         <div class="panel">
-          <div style="overflow-x:auto;">
+          <div class="table-scroll">
             <table>
-              <thead><tr>
-                <th>Placa</th><th>Modelo</th><th>Frota</th><th>KM</th><th>Status</th><th>Motorista</th><th class="admin-only-col hidden" id="vhActionsTh">Ações</th>
-              </tr></thead>
+              <thead id="vehiclesThead"></thead>
               <tbody id="vehiclesTbody"></tbody>
             </table>
           </div>
+          <div id="vehiclesPagination" class="pagination-bar"></div>
           <div id="vehiclesEmpty" class="empty-state hidden"><div class="ic">🚐</div>Nenhum veículo cadastrado ainda.</div>
         </div>
       </section>
@@ -446,14 +487,13 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
           </div>
         </div>
         <div class="panel">
-          <div style="overflow-x:auto;">
+          <div class="table-scroll">
             <table>
-              <thead><tr>
-                <th>Nome</th><th>CNH</th><th>Categoria</th><th>Validade CNH</th><th>Telefone</th><th>Veículo atual</th><th>Status</th><th class="admin-only-col hidden" id="drvActionsTh">Ações</th>
-              </tr></thead>
+              <thead id="driversThead"></thead>
               <tbody id="driversTbody"></tbody>
             </table>
           </div>
+          <div id="driversPagination" class="pagination-bar"></div>
           <div id="driversEmpty" class="empty-state hidden"><div class="ic">🧑‍✈️</div>Nenhum motorista cadastrado ainda.</div>
         </div>
       </section>
@@ -477,14 +517,13 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
           </div>
         </div>
         <div class="panel">
-          <div style="overflow-x:auto;">
+          <div class="table-scroll">
             <table>
-              <thead><tr>
-                <th>Data</th><th>Veículo</th><th>Condutor</th><th>KM</th><th>Resultado</th><th class="admin-only-col hidden" id="inspActionsTh">Ações</th>
-              </tr></thead>
+              <thead id="inspectionsThead"></thead>
               <tbody id="inspectionsTbody"></tbody>
             </table>
           </div>
+          <div id="inspectionsPagination" class="pagination-bar"></div>
           <div id="inspectionsEmpty" class="empty-state hidden"><div class="ic">📋</div>Nenhuma vistoria registrada ainda.</div>
         </div>
       </section>
@@ -497,6 +536,7 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
             <div class="desc" id="ticketCountDesc">Carregando ordens de serviço…</div>
           </div>
           <div class="toolbar">
+            <div class="search-wrap"><span class="ic">🔍</span><input class="search-input" id="ticketSearch" placeholder="O.S. ou placa"></div>
             <select class="search-input" id="ticketFilterStatus" style="padding-left:12px; min-width:190px;">
               <option value="">Todos os status</option>
               <option value="NOVO">Aberta</option>
@@ -516,14 +556,13 @@ tr.row-click:hover{background:var(--surface-alt); cursor:pointer;}
           </div>
         </div>
         <div class="panel">
-          <div style="overflow-x:auto;">
+          <div class="table-scroll">
             <table>
-              <thead><tr>
-                <th>O.S.</th><th>Veículo</th><th>Prioridade</th><th>Status</th><th>Aberto em</th><th class="admin-only-col hidden" id="tkActionsTh">Ações</th>
-              </tr></thead>
+              <thead id="ticketsThead"></thead>
               <tbody id="ticketsTbody"></tbody>
             </table>
           </div>
+          <div id="ticketsPagination" class="pagination-bar"></div>
           <div id="ticketsEmpty" class="empty-state hidden"><div class="ic">🛠</div>Nenhuma O.S. registrada ainda. Bom sinal — ou ninguém abriu a primeira.</div>
         </div>
       </section>
@@ -951,6 +990,66 @@ let ticketsListenerReady = false;
 let slowTicketCheckInterval = null;
 let unsubscribers = [];
 
+/* ============ ORDENAÇÃO / PAGINAÇÃO DE TABELAS ============ */
+const TABLE_PAGE_SIZE = 10;
+const tableSortState = {
+  vehicles: {key:null, dir:1}, drivers: {key:null, dir:1},
+  inspections: {key:null, dir:1}, tickets: {key:null, dir:1},
+};
+const tablePageState = { vehicles:1, drivers:1, inspections:1, tickets:1 };
+
+function sortRows(rows, sortState, accessors){
+  if(!sortState.key || !accessors[sortState.key]) return rows;
+  const accessor = accessors[sortState.key];
+  return [...rows].sort((a,b)=>{
+    let av = accessor(a), bv = accessor(b);
+    if(typeof av==='string') av = av.toLowerCase();
+    if(typeof bv==='string') bv = bv.toLowerCase();
+    if(av<bv) return -1*sortState.dir;
+    if(av>bv) return 1*sortState.dir;
+    return 0;
+  });
+}
+
+function toggleSort(table, key, rerender){
+  const s = tableSortState[table];
+  if(s.key===key) s.dir *= -1; else { s.key = key; s.dir = 1; }
+  tablePageState[table] = 1;
+  rerender();
+}
+
+function sortableTh(table, key, label, extraAttrs){
+  const s = tableSortState[table];
+  const arrow = s.key===key ? (s.dir===1?'▲':'▼') : '';
+  return `<th class="th-sortable" ${extraAttrs||''} onclick="window.toggleSortTable('${table}','${key}')">${label} <span class="arrow">${arrow}</span></th>`;
+}
+
+function renderPaginationBar(table, containerId, totalItems, rerender){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const page = tablePageState[table];
+  const totalPages = Math.max(1, Math.ceil(totalItems/TABLE_PAGE_SIZE));
+  if(totalItems<=TABLE_PAGE_SIZE){ el.innerHTML=''; return; }
+  el.innerHTML = `
+    <button type="button" class="btn btn-ghost btn-xs" id="${containerId}Prev" ${page<=1?'disabled':''}>‹ Anterior</button>
+    <span>Página ${page} de ${totalPages}</span>
+    <button type="button" class="btn btn-ghost btn-xs" id="${containerId}Next" ${page>=totalPages?'disabled':''}>Próxima ›</button>
+  `;
+  document.getElementById(containerId+'Prev').onclick = ()=>{ tablePageState[table] = Math.max(1,page-1); rerender(); };
+  document.getElementById(containerId+'Next').onclick = ()=>{ tablePageState[table] = Math.min(totalPages,page+1); rerender(); };
+}
+
+function paginateRows(table, rows){
+  const page = tablePageState[table];
+  const start = (page-1)*TABLE_PAGE_SIZE;
+  return rows.slice(start, start+TABLE_PAGE_SIZE);
+}
+
+window.toggleSortTable = function(table, key){
+  const rerenderMap = { vehicles: ()=>renderVehicles(), drivers: ()=>renderDrivers(), inspections: ()=>renderInspections(), tickets: ()=>renderTickets() };
+  toggleSort(table, key, rerenderMap[table]);
+};
+
 const ROLE_LABEL = {admin:'Administrador', supervisor:'Supervisor', mecanico:'Mecânico', motorista:'Motorista'};
 const PRIORITY_LABEL = {CRITICA:'Crítica', ALTA:'Alta', MEDIA:'Média', BAIXA:'Baixa'};
 const STATUS_LABEL = {NOVO:'Aberta', EM_ANDAMENTO:'Em andamento', PENDENTE:'Pendente', AGUARDANDO_PECA:'Aguardando peça', CONCLUIDO:'Concluída'};
@@ -1198,6 +1297,7 @@ function switchView(view, filter){
 
   if(view==='vehicles'){
     document.getElementById('vehicleFilterStatus').value = filter || '';
+    tablePageState.vehicles = 1;
     renderVehicles();
   }
   if(view==='tickets'){
@@ -1209,6 +1309,7 @@ function switchView(view, filter){
       document.getElementById('ticketFilterStatus').value = filter || '';
       document.getElementById('ticketFilterPriority').value = '';
     }
+    tablePageState.tickets = 1;
     renderTickets();
   }
   if(view==='meucarro'){
@@ -1308,24 +1409,23 @@ document.getElementById('btnConfirmChangePassword').addEventListener('click', as
 function renderDashboard(){
   const totalV = vehicles.length;
   const disponiveis = vehicles.filter(v=>v.status==='disponivel').length;
-  const emManutencao = vehicles.filter(v=>v.status==='em-manutencao').length;
   const abertos = tickets.filter(t=>t.status!=='CONCLUIDO').length;
-  const criticos = tickets.filter(t=>t.priority==='CRITICA' && t.status!=='CONCLUIDO').length;
   const concluidos = tickets.filter(t=>t.status==='CONCLUIDO').length;
 
   const cards = [
-    {val: totalV, lbl:'Veículos na frota', view:'vehicles', accent:'var(--brand)'},
-    {val: disponiveis, lbl:'Disponíveis', view:'vehicles', filter:'disponivel', accent:'var(--st-concluido)'},
-    {val: emManutencao, lbl:'Em manutenção', view:'vehicles', filter:'em-manutencao', accent:'var(--st-manutencao)'},
-    {val: abertos, lbl:'Chamados abertos', view:'tickets', accent:'var(--st-alta)'},
-    {val: criticos, lbl:'Chamados críticos', view:'tickets', filter:'CRITICA', accent:'var(--st-critica)'},
-    {val: concluidos, lbl:'Concluídos', view:'tickets', filter:'CONCLUIDO', accent:'var(--st-concluido)'},
+    {val: totalV, lbl:'Veículos na frota', view:'vehicles', accent:'var(--brand)', icon:'🚐'},
+    {val: disponiveis, lbl:'Disponíveis', view:'vehicles', filter:'disponivel', accent:'var(--st-concluido)', icon:'✅'},
+    {val: abertos, lbl:'Chamados abertos', view:'tickets', accent:'var(--st-alta)', icon:'🛠'},
+    {val: concluidos, lbl:'Concluídos', view:'tickets', filter:'CONCLUIDO', accent:'var(--st-concluido)', icon:'🏁'},
   ];
   document.getElementById('kpiGrid').innerHTML = cards.map(c=>`
     <button type="button" class="kpi-card" style="--accent:${c.accent}" onclick="switchView('${c.view}', ${c.filter ? `'${c.filter}'` : 'null'})">
+      <div class="kpi-ic">${c.icon}</div>
       <div class="val">${c.val}</div>
       <div class="lbl">${c.lbl}</div>
     </button>`).join('');
+
+  renderCharts();
 
   const recent = [...tickets].sort((a,b)=>b.createdAt-a.createdAt).slice(0,6);
   const el = document.getElementById('dashRecentTickets');
@@ -1342,6 +1442,61 @@ function renderDashboard(){
     </tr>`).join('') + `</tbody></table>`;
 }
 
+function renderCharts(){
+  const total = tickets.length;
+  const concluidas = tickets.filter(t=>t.status==='CONCLUIDO').length;
+  const abertas = total - concluidas;
+  const pctConcl = total ? Math.round((concluidas/total)*100) : 0;
+  const r = 40, circumference = 2*Math.PI*r;
+  const conclLen = total ? (concluidas/total)*circumference : 0;
+  const openClosedEl = document.getElementById('chartOpenClosed');
+  if(openClosedEl){
+    openClosedEl.innerHTML = total ? `
+      <div class="donut-wrap">
+        <svg width="108" height="108" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--surface-alt)" stroke-width="14"/>
+          <circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--st-concluido)" stroke-width="14"
+            stroke-dasharray="${conclLen.toFixed(1)} ${(circumference-conclLen).toFixed(1)}"
+            stroke-linecap="round" transform="rotate(-90 50 50)"/>
+          <text x="50" y="47" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)" font-family="'IBM Plex Mono',monospace">${pctConcl}%</text>
+          <text x="50" y="62" text-anchor="middle" font-size="8" fill="var(--ink-muted)">concluídas</text>
+        </svg>
+        <div>
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--st-alta);"></span>Abertas <strong style="margin-left:auto; padding-left:10px;">${abertas}</strong></div>
+          <div class="donut-legend-item"><span class="donut-legend-dot" style="background:var(--st-concluido);"></span>Concluídas <strong style="margin-left:auto; padding-left:10px;">${concluidas}</strong></div>
+        </div>
+      </div>` : `<div class="empty-state" style="padding:10px;"><div class="ic">📊</div>Sem O.S. registradas ainda.</div>`;
+  }
+
+  const prioOrder = ['CRITICA','ALTA','MEDIA','BAIXA'];
+  const prioColors = {CRITICA:'var(--st-critica)', ALTA:'var(--st-alta)', MEDIA:'var(--st-media)', BAIXA:'var(--st-baixa)'};
+  const prioCounts = prioOrder.map(p=>tickets.filter(t=>t.priority===p).length);
+  const maxPrio = Math.max(1, ...prioCounts);
+  const priorityEl = document.getElementById('chartByPriority');
+  if(priorityEl){
+    priorityEl.innerHTML = total ? prioOrder.map((p,i)=>`
+      <div class="bar-row">
+        <div class="bar-label">${PRIORITY_LABEL[p]}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((prioCounts[i]/maxPrio)*100)}%; background:${prioColors[p]};"></div></div>
+        <div class="bar-count">${prioCounts[i]}</div>
+      </div>`).join('') : `<div class="empty-state" style="padding:10px;"><div class="ic">📊</div>Sem O.S. registradas ainda.</div>`;
+  }
+
+  const statusOrder = ['NOVO','EM_ANDAMENTO','PENDENTE','AGUARDANDO_PECA','CONCLUIDO'];
+  const statusColors = {NOVO:'var(--st-analise)', EM_ANDAMENTO:'var(--brand)', PENDENTE:'var(--st-alta)', AGUARDANDO_PECA:'var(--st-manutencao)', CONCLUIDO:'var(--st-concluido)'};
+  const statusCounts = statusOrder.map(s=>tickets.filter(t=>t.status===s).length);
+  const maxStatus = Math.max(1, ...statusCounts);
+  const statusEl = document.getElementById('chartByStatus');
+  if(statusEl){
+    statusEl.innerHTML = total ? statusOrder.map((s,i)=>`
+      <div class="bar-row">
+        <div class="bar-label">${STATUS_LABEL[s]}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round((statusCounts[i]/maxStatus)*100)}%; background:${statusColors[s]};"></div></div>
+        <div class="bar-count">${statusCounts[i]}</div>
+      </div>`).join('') : `<div class="empty-state" style="padding:10px;"><div class="ic">📊</div>Sem O.S. registradas ainda.</div>`;
+  }
+}
+
 /* ============ VEHICLES ============ */
 function populateVehicleSelect(){
   const options = vehicles.map(v=>`<option value="${v.id}">${escapeHtml(v.plate)} — ${escapeHtml(v.model||'')}</option>`).join('');
@@ -1354,14 +1509,24 @@ function renderVehicles(){
   const statusFilter = document.getElementById('vehicleFilterStatus').value;
   const fleetFilter = document.getElementById('vehicleFilterFleet').value;
   const isAdmin = currentUser.role === 'admin';
-  const filtered = vehicles.filter(v =>
+  let filtered = vehicles.filter(v =>
     (!statusFilter || v.status===statusFilter) &&
     (!fleetFilter || v.fleet===fleetFilter) &&
     (!search || (v.plate||'').toLowerCase().includes(search) || (v.model||'').toLowerCase().includes(search))
   );
+  filtered = sortRows(filtered, tableSortState.vehicles, {
+    plate: v=>v.plate||'', model: v=>((v.brand?v.brand+' ':'')+(v.model||'')),
+    fleet: v=>FLEET_LABEL[v.fleet]||'', km: v=>v.km||0,
+    status: v=>VEHICLE_STATUS_LABEL[v.status]||'', driver: v=>driverName(v.driverId),
+  });
   document.getElementById('vehicleCountDesc').textContent = `${vehicles.length} veículo(s) cadastrado(s)`;
   document.getElementById('vehiclesEmpty').classList.toggle('hidden', filtered.length>0);
-  document.getElementById('vehiclesTbody').innerHTML = filtered.map(v=>`
+  document.getElementById('vehiclesThead').innerHTML = `<tr>
+    ${sortableTh('vehicles','plate','Placa')}${sortableTh('vehicles','model','Modelo')}${sortableTh('vehicles','fleet','Frota')}
+    ${sortableTh('vehicles','km','KM')}${sortableTh('vehicles','status','Status')}${sortableTh('vehicles','driver','Motorista')}
+    <th class="admin-only-col ${isAdmin?'':'hidden'}">Ações</th>
+  </tr>`;
+  document.getElementById('vehiclesTbody').innerHTML = paginateRows('vehicles', filtered).map(v=>`
     <tr class="row-click" onclick="openVehicleDetail('${v.id}')">
       <td><span class="plate">${escapeHtml(v.plate)}</span></td>
       <td>${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</td>
@@ -1371,10 +1536,11 @@ function renderVehicles(){
       <td>${escapeHtml(driverName(v.driverId))}</td>
       ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteVehicle('${v.id}')">Excluir</button></td>` : ''}
     </tr>`).join('');
+  renderPaginationBar('vehicles', 'vehiclesPagination', filtered.length, renderVehicles);
 }
-document.getElementById('vehicleSearch').addEventListener('input', renderVehicles);
-document.getElementById('vehicleFilterStatus').addEventListener('change', renderVehicles);
-document.getElementById('vehicleFilterFleet').addEventListener('change', renderVehicles);
+document.getElementById('vehicleSearch').addEventListener('input', ()=>{ tablePageState.vehicles=1; renderVehicles(); });
+document.getElementById('vehicleFilterStatus').addEventListener('change', ()=>{ tablePageState.vehicles=1; renderVehicles(); });
+document.getElementById('vehicleFilterFleet').addEventListener('change', ()=>{ tablePageState.vehicles=1; renderVehicles(); });
 
 /* ============ FROTAS (visão separada, agrupada) ============ */
 function renderFleetOverview(){
@@ -1507,13 +1673,25 @@ function renderDrivers(){
   const search = document.getElementById('driverSearch').value.toLowerCase();
   const statusFilter = document.getElementById('driverFilterStatus').value;
   const isAdmin = currentUser.role === 'admin';
-  const filtered = drivers.filter(d =>
+  let filtered = drivers.filter(d =>
     (!statusFilter || d.status===statusFilter) &&
     (!search || (d.name||'').toLowerCase().includes(search) || (d.cnh||'').toLowerCase().includes(search))
   );
+  filtered = sortRows(filtered, tableSortState.drivers, {
+    name: d=>d.name||'', cnh: d=>d.cnh||'', cnhCategory: d=>d.cnhCategory||'',
+    cnhValidity: d=>d.cnhValidity||'', phone: d=>d.phone||'',
+    vehicle: d=>{ const v = vehicles.find(x=>x.driverId===d.id); return v?v.plate:''; },
+    status: d=>d.status||'',
+  });
   document.getElementById('driverCountDesc').textContent = `${drivers.length} motorista(s) cadastrado(s)`;
   document.getElementById('driversEmpty').classList.toggle('hidden', filtered.length>0);
-  document.getElementById('driversTbody').innerHTML = filtered.map(d=>{
+  document.getElementById('driversThead').innerHTML = `<tr>
+    ${sortableTh('drivers','name','Nome')}${sortableTh('drivers','cnh','CNH')}${sortableTh('drivers','cnhCategory','Categoria')}
+    ${sortableTh('drivers','cnhValidity','Validade CNH')}${sortableTh('drivers','phone','Telefone')}${sortableTh('drivers','vehicle','Veículo')}
+    ${sortableTh('drivers','status','Status')}
+    <th class="admin-only-col ${isAdmin?'':'hidden'}">Ações</th>
+  </tr>`;
+  document.getElementById('driversTbody').innerHTML = paginateRows('drivers', filtered).map(d=>{
     const vehicle = vehicles.find(v=>v.driverId===d.id);
     const expired = isCnhExpired(d);
     return `
@@ -1528,9 +1706,10 @@ function renderDrivers(){
       ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteDriver('${d.id}')">Excluir</button></td>` : ''}
     </tr>`;
   }).join('');
+  renderPaginationBar('drivers', 'driversPagination', filtered.length, renderDrivers);
 }
-document.getElementById('driverSearch').addEventListener('input', renderDrivers);
-document.getElementById('driverFilterStatus').addEventListener('change', renderDrivers);
+document.getElementById('driverSearch').addEventListener('input', ()=>{ tablePageState.drivers=1; renderDrivers(); });
+document.getElementById('driverFilterStatus').addEventListener('change', ()=>{ tablePageState.drivers=1; renderDrivers(); });
 
 document.getElementById('btnNewDriver').addEventListener('click', ()=>openDriverModal(null));
 function openDriverModal(id){
@@ -1726,13 +1905,22 @@ function renderInspections(){
   const resultFilter = document.getElementById('inspectionFilterResult').value;
   const isAdmin = currentUser.role === 'admin';
   const sorted = [...inspections].sort((a,b)=>b.createdAt-a.createdAt);
-  const filtered = sorted.filter(i =>
+  let filtered = sorted.filter(i =>
     (!resultFilter || i.result===resultFilter) &&
     (!search || (i.vehiclePlate||'').toLowerCase().includes(search) || driverName(i.driverId).toLowerCase().includes(search))
   );
+  filtered = sortRows(filtered, tableSortState.inspections, {
+    date: i=>i.createdAt||0, plate: i=>i.vehiclePlate||'', driver: i=>driverName(i.driverId),
+    km: i=>i.km||0, result: i=>RESULT_LABEL[i.result]||'',
+  });
   document.getElementById('inspectionCountDesc').textContent = `${inspections.length} vistoria(s) registrada(s)`;
   document.getElementById('inspectionsEmpty').classList.toggle('hidden', filtered.length>0);
-  document.getElementById('inspectionsTbody').innerHTML = filtered.map(i=>`
+  document.getElementById('inspectionsThead').innerHTML = `<tr>
+    ${sortableTh('inspections','date','Data')}${sortableTh('inspections','plate','Placa')}${sortableTh('inspections','driver','Motorista')}
+    ${sortableTh('inspections','km','KM')}${sortableTh('inspections','result','Resultado')}
+    <th class="admin-only-col ${isAdmin?'':'hidden'}">Ações</th>
+  </tr>`;
+  document.getElementById('inspectionsTbody').innerHTML = paginateRows('inspections', filtered).map(i=>`
     <tr class="row-click" onclick="openInspectionDetail('${i.id}')">
       <td>${fmtDate(i.createdAt)}</td>
       <td><span class="plate">${escapeHtml(i.vehiclePlate)}</span></td>
@@ -1741,9 +1929,10 @@ function renderInspections(){
       <td><span class="result-pill res-${i.result}">${RESULT_LABEL[i.result]}</span></td>
       ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteInspection('${i.id}')">Excluir</button></td>` : ''}
     </tr>`).join('');
+  renderPaginationBar('inspections', 'inspectionsPagination', filtered.length, renderInspections);
 }
-document.getElementById('inspectionSearch').addEventListener('input', renderInspections);
-document.getElementById('inspectionFilterResult').addEventListener('change', renderInspections);
+document.getElementById('inspectionSearch').addEventListener('input', ()=>{ tablePageState.inspections=1; renderInspections(); });
+document.getElementById('inspectionFilterResult').addEventListener('change', ()=>{ tablePageState.inspections=1; renderInspections(); });
 
 document.getElementById('btnNewInspection').addEventListener('click', ()=>{
   document.getElementById('inspVehicle').value = vehicles[0]?.id || '';
@@ -1908,18 +2097,29 @@ function ticketTagHtml(t){
 }
 
 function renderTickets(){
+  const search = document.getElementById('ticketSearch').value.toLowerCase();
   const statusFilter = document.getElementById('ticketFilterStatus').value;
   const priorityFilter = document.getElementById('ticketFilterPriority').value;
   const isAdmin = currentUser.role === 'admin';
   const sorted = [...tickets].sort((a,b)=>b.createdAt-a.createdAt);
-  const filtered = sorted.filter(t=>{
+  let filtered = sorted.filter(t=>{
     if(priorityFilter && t.priority!==priorityFilter) return false;
     if(statusFilter && t.status!==statusFilter) return false;
+    if(search && !((t.ticketNumber||'').toLowerCase().includes(search) || (t.vehiclePlate||'').toLowerCase().includes(search))) return false;
     return true;
+  });
+  filtered = sortRows(filtered, tableSortState.tickets, {
+    number: t=>t.ticketNumber||'', plate: t=>t.vehiclePlate||'', priority: t=>PRIORITY_LABEL[t.priority]||'',
+    status: t=>STATUS_LABEL[t.status]||'', date: t=>t.createdAt||0,
   });
   document.getElementById('ticketCountDesc').textContent = `${tickets.length} O.S. registrada(s)`;
   document.getElementById('ticketsEmpty').classList.toggle('hidden', filtered.length>0);
-  document.getElementById('ticketsTbody').innerHTML = filtered.map(t=>`
+  document.getElementById('ticketsThead').innerHTML = `<tr>
+    ${sortableTh('tickets','number','O.S.')}${sortableTh('tickets','plate','Placa')}${sortableTh('tickets','priority','Prioridade')}
+    ${sortableTh('tickets','status','Status')}${sortableTh('tickets','date','Aberta em')}
+    <th class="admin-only-col ${isAdmin?'':'hidden'}">Ações</th>
+  </tr>`;
+  document.getElementById('ticketsTbody').innerHTML = paginateRows('tickets', filtered).map(t=>`
     <tr class="row-click" onclick="openTicketDetail('${t.id}')">
       <td>${ticketTagHtml(t)}</td>
       <td><span class="plate">${escapeHtml(t.vehiclePlate||'—')}</span></td>
@@ -1928,9 +2128,11 @@ function renderTickets(){
       <td>${fmtDate(t.createdAt)}</td>
       ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteTicket('${t.id}')">Excluir</button></td>` : ''}
     </tr>`).join('');
+  renderPaginationBar('tickets', 'ticketsPagination', filtered.length, renderTickets);
 }
-document.getElementById('ticketFilterStatus').addEventListener('change', renderTickets);
-document.getElementById('ticketFilterPriority').addEventListener('change', renderTickets);
+document.getElementById('ticketSearch').addEventListener('input', ()=>{ tablePageState.tickets=1; renderTickets(); });
+document.getElementById('ticketFilterStatus').addEventListener('change', ()=>{ tablePageState.tickets=1; renderTickets(); });
+document.getElementById('ticketFilterPriority').addEventListener('change', ()=>{ tablePageState.tickets=1; renderTickets(); });
 
 document.getElementById('btnNewTicket').addEventListener('click', ()=>{
   document.getElementById('tkVehicle').disabled = false;
