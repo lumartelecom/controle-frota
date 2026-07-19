@@ -1121,6 +1121,7 @@ function attachStaffListeners(){
 
   ticketsListenerReady = false;
   unsubscribers.push(onSnapshot(collection(db,'tickets'), snap=>{
+    console.log('[WhatsApp] snapshot de tickets recebido. ticketsListenerReady =', ticketsListenerReady, '— mudanças:', snap.docChanges().map(c=>c.type));
     if(ticketsListenerReady){
       snap.docChanges().forEach(change=>{
         if(change.type==='added') notifyNewTicket({id:change.doc.id, ...change.doc.data()});
@@ -1142,8 +1143,9 @@ function attachStaffListeners(){
 
   unsubscribers.push(onSnapshot(doc(db,'settings','whatsapp'), snap=>{
     whatsappSettings = snap.exists() ? { recipients:[], slowHours:48, ...snap.data() } : { recipients:[], slowHours:48 };
+    console.log('[WhatsApp] settings/whatsapp carregado:', JSON.stringify(whatsappSettings));
     renderWhatsappSettings();
-  }, err=>toast('Erro lendo config. WhatsApp: '+err.message, 'err')));
+  }, err=>{ console.error('[WhatsApp] erro lendo settings/whatsapp:', err); toast('Erro lendo config. WhatsApp: '+err.message, 'err'); }));
 
   checkSlowTickets();
   if(slowTicketCheckInterval) clearInterval(slowTicketCheckInterval);
@@ -2213,20 +2215,34 @@ window.deleteRole = deleteRole;
 /* ============ NOTIFICAÇÕES WHATSAPP (CallMeBot) ============ */
 function sendWhatsApp(recipient, text){
   const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(recipient.phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(recipient.apikey)}`;
-  // no-cors: disparo "e esquece", não precisamos ler a resposta.
-  fetch(url, { mode:'no-cors' }).catch(err=>console.error('Erro ao enviar WhatsApp:', err));
+  console.log('[WhatsApp] enviando para', recipient.name, recipient.phone, '→', url);
+  // no-cors: disparo "e esquece". Não dá pra ler a resposta, então não sabemos se o
+  // CallMeBot aceitou ou recusou — só que o navegador tentou mandar a requisição.
+  fetch(url, { mode:'no-cors' })
+    .then(()=>console.log('[WhatsApp] requisição concluída (sem detalhes, é no-cors) para', recipient.name))
+    .catch(err=>console.error('[WhatsApp] Erro de rede ao enviar:', err));
 }
 
 function notifyWhatsApp(text){
-  (whatsappSettings.recipients||[]).forEach(r=>sendWhatsApp(r, text));
+  const recipients = whatsappSettings.recipients||[];
+  console.log('[WhatsApp] notifyWhatsApp — destinatários carregados:', JSON.stringify(recipients));
+  recipients.forEach(r=>sendWhatsApp(r, text));
 }
 
 function notifyNewTicket(t){
+  console.log('[WhatsApp] notifyNewTicket chamado para', t.ticketNumber, '— total de destinatários:', (whatsappSettings.recipients||[]).length);
   if(!(whatsappSettings.recipients||[]).length) return;
+  const vehicle = vehicles.find(v=>v.id===t.vehicleId);
+  const modelText = vehicle ? ((vehicle.brand?vehicle.brand+' ':'')+(vehicle.model||'')).trim() : '';
+  const veiculoLine = modelText ? `${t.vehiclePlate||'—'} — ${modelText}` : (t.vehiclePlate||'—');
+  const frotaText = vehicle ? (FLEET_LABEL[vehicle.fleet] || '—') : '—';
+  const motoristaText = vehicle && vehicle.driverId ? driverName(vehicle.driverId) : '—';
   notifyWhatsApp(
     `🛠 Nova O.S. aberta\n` +
     `O.S.: ${t.ticketNumber}\n` +
-    `Veículo: ${t.vehiclePlate||'—'}\n` +
+    `Veículo: ${veiculoLine}\n` +
+    `Frota: ${frotaText}\n` +
+    `Motorista: ${motoristaText}\n` +
     `Prioridade: ${PRIORITY_LABEL[t.priority]||t.priority}\n` +
     `Aberta por: ${t.openedByName||'—'}\n` +
     `Descrição: ${t.description||'—'}`
