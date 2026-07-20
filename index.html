@@ -1216,10 +1216,7 @@ let swapAvailableVehicles = [];
 let currentSwapLeg = null;
 let allRoles = [];
 let whatsappSettings = { recipients: [], slowHours: 48 };
-let ticketsListenerReady = false;
-let swapRequestsListenerReady = false;
 let swapDeepLinkHandled = false;
-let slowTicketCheckInterval = null;
 let unsubscribers = [];
 let swapRequests = [];
 let currentSwapApprovalId = null;
@@ -1406,7 +1403,6 @@ document.getElementById('btnLogout').addEventListener('click', ()=>{
 onAuthStateChanged(auth, async (user)=>{
   unsubscribers.forEach(fn=>fn());
   unsubscribers = [];
-  if(slowTicketCheckInterval){ clearInterval(slowTicketCheckInterval); slowTicketCheckInterval = null; }
   if(!user){
     currentUser = null;
     document.getElementById('appShell').classList.add('hidden');
@@ -1490,17 +1486,9 @@ function attachStaffListeners(){
     renderRolesTable();
   }, err=>toast('Erro lendo usuários: '+err.message, 'err')));
 
-  ticketsListenerReady = false;
   unsubscribers.push(onSnapshot(collection(db,'tickets'), snap=>{
-    console.log('[WhatsApp] snapshot de tickets recebido. ticketsListenerReady =', ticketsListenerReady, '— mudanças:', snap.docChanges().map(c=>c.type));
-    if(ticketsListenerReady){
-      snap.docChanges().forEach(change=>{
-        if(change.type==='added') notifyNewTicket({id:change.doc.id, ...change.doc.data()});
-      });
-    }
     tickets = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderTickets(); renderDashboard();
-    ticketsListenerReady = true;
   }, err=>toast('Erro lendo O.S.: '+err.message, 'err')));
 
   unsubscribers.push(onSnapshot(collection(db,'inspections'), snap=>{
@@ -1512,31 +1500,19 @@ function attachStaffListeners(){
     vehicleSwaps = snap.docs.map(d=>({id:d.id, ...d.data()}));
   }, err=>toast('Erro lendo trocas: '+err.message, 'err')));
 
-  swapRequestsListenerReady = false;
   unsubscribers.push(onSnapshot(collection(db,'swapRequests'), snap=>{
-    if(swapRequestsListenerReady){
-      snap.docChanges().forEach(change=>{
-        const data = change.doc.data();
-        if(change.type==='modified' && data.status==='AGUARDANDO_APROVACAO' && !data.notifiedApproval){
-          notifyNewSwapApprovalRequest({id:change.doc.id, ...data});
-        }
-      });
-    }
     swapRequests = snap.docs.map(d=>({id:d.id, ...d.data()}));
     renderSwapRequests();
-    swapRequestsListenerReady = true;
     handleSwapDeepLink();
   }, err=>toast('Erro lendo solicitações de troca: '+err.message, 'err')));
 
+  // Os avisos de WhatsApp (nova O.S., O.S. demorada, troca aguardando aprovação) rodam
+  // do lado do servidor (Cloud Functions) — ver pasta functions/. Esse listener só serve
+  // pra alimentar a tela de configuração (destinatários e prazo).
   unsubscribers.push(onSnapshot(doc(db,'settings','whatsapp'), snap=>{
     whatsappSettings = snap.exists() ? { recipients:[], slowHours:48, ...snap.data() } : { recipients:[], slowHours:48 };
-    console.log('[WhatsApp] settings/whatsapp carregado:', JSON.stringify(whatsappSettings));
     renderWhatsappSettings();
-  }, err=>{ console.error('[WhatsApp] erro lendo settings/whatsapp:', err); toast('Erro lendo config. WhatsApp: '+err.message, 'err'); }));
-
-  checkSlowTickets();
-  if(slowTicketCheckInterval) clearInterval(slowTicketCheckInterval);
-  slowTicketCheckInterval = setInterval(checkSlowTickets, 15*60*1000);
+  }, err=>toast('Erro lendo config. WhatsApp: '+err.message, 'err')));
 }
 
 function attachMotoristaListeners(){
@@ -2078,28 +2054,6 @@ document.getElementById('btnConfirmAdjust').addEventListener('click', async ()=>
     toast('Erro ao solicitar ajuste: '+err.message, 'err');
   }
 });
-
-async function notifyNewSwapApprovalRequest(s){
-  console.log('[WhatsApp] notifyNewSwapApprovalRequest chamado para', s.id, '— total de destinatários:', (whatsappSettings.recipients||[]).length);
-  if(!(whatsappSettings.recipients||[]).length) return;
-  const link = `${location.origin}${location.pathname}#trocas/${s.id}`;
-  const fromVehicle = vehicles.find(v=>v.id===s.fromVehicleId);
-  const toVehicle = vehicles.find(v=>v.id===s.toVehicleId);
-  const fromModelText = fromVehicle ? ((fromVehicle.brand?fromVehicle.brand+' ':'')+(fromVehicle.model||'')).trim() : '';
-  const toModelText = toVehicle ? ((toVehicle.brand?toVehicle.brand+' ':'')+(toVehicle.model||'')).trim() : '';
-  const fromLine = fromModelText ? `${s.fromPlate||'—'} — ${fromModelText}` : (s.fromPlate||'—');
-  const toLine = toModelText ? `${s.toPlate||'—'} — ${toModelText}` : (s.toPlate||'—');
-  notifyWhatsApp(
-    `🔄 Nova solicitação de troca de veículo aguardando aprovação\n` +
-    `Motorista: ${s.driverName||driverName(s.driverId)}\n` +
-    `Veículo atual: ${fromLine}\n` +
-    `Novo veículo: ${toLine}\n` +
-    `Motivo: ${s.reason||'—'}\n` +
-    `Analisar: ${link}`
-  );
-  try { await updateDoc(doc(db,'swapRequests',s.id), {notifiedApproval:true}); }
-  catch(err){ console.error('Erro ao marcar solicitação como notificada:', err); }
-}
 
 function handleSwapDeepLink(){
   if(swapDeepLinkHandled) return;
@@ -3245,62 +3199,9 @@ async function deleteRole(id){
 window.deleteRole = deleteRole;
 
 /* ============ NOTIFICAÇÕES WHATSAPP (CallMeBot) ============ */
-function sendWhatsApp(recipient, text){
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(recipient.phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(recipient.apikey)}`;
-  console.log('[WhatsApp] enviando para', recipient.name, recipient.phone, '→', url);
-  // no-cors: disparo "e esquece". Não dá pra ler a resposta, então não sabemos se o
-  // CallMeBot aceitou ou recusou — só que o navegador tentou mandar a requisição.
-  fetch(url, { mode:'no-cors' })
-    .then(()=>console.log('[WhatsApp] requisição concluída (sem detalhes, é no-cors) para', recipient.name))
-    .catch(err=>console.error('[WhatsApp] Erro de rede ao enviar:', err));
-}
-
-function notifyWhatsApp(text){
-  const recipients = whatsappSettings.recipients||[];
-  console.log('[WhatsApp] notifyWhatsApp — destinatários carregados:', JSON.stringify(recipients));
-  recipients.forEach(r=>sendWhatsApp(r, text));
-}
-
-function notifyNewTicket(t){
-  console.log('[WhatsApp] notifyNewTicket chamado para', t.ticketNumber, '— total de destinatários:', (whatsappSettings.recipients||[]).length);
-  if(!(whatsappSettings.recipients||[]).length) return;
-  const vehicle = vehicles.find(v=>v.id===t.vehicleId);
-  const modelText = vehicle ? ((vehicle.brand?vehicle.brand+' ':'')+(vehicle.model||'')).trim() : '';
-  const veiculoLine = modelText ? `${t.vehiclePlate||'—'} — ${modelText}` : (t.vehiclePlate||'—');
-  const frotaText = vehicle ? (FLEET_LABEL[vehicle.fleet] || '—') : '—';
-  const motoristaText = vehicle && vehicle.driverId ? driverName(vehicle.driverId) : '—';
-  notifyWhatsApp(
-    `🛠 Nova O.S. aberta\n` +
-    `O.S.: ${t.ticketNumber}\n` +
-    `Veículo: ${veiculoLine}\n` +
-    `Frota: ${frotaText}\n` +
-    `Motorista: ${motoristaText}\n` +
-    `Prioridade: ${PRIORITY_LABEL[t.priority]||t.priority}\n` +
-    `Aberta por: ${t.openedByName||'—'}\n` +
-    `Descrição: ${t.description||'—'}`
-  );
-}
-
-async function checkSlowTickets(){
-  if(!currentUser || currentUser.role==='motorista') return;
-  const recipients = whatsappSettings.recipients||[];
-  if(!recipients.length) return;
-  const slowHours = whatsappSettings.slowHours || 48;
-  const cutoff = Date.now() - slowHours*3600*1000;
-  const slow = tickets.filter(t => t.status!=='CONCLUIDO' && t.createdAt < cutoff && !t.slowNotified);
-  for(const t of slow){
-    notifyWhatsApp(
-      `⏰ O.S. demorando pra concluir (mais de ${slowHours}h)\n` +
-      `O.S.: ${t.ticketNumber}\n` +
-      `Veículo: ${t.vehiclePlate||'—'}\n` +
-      `Aberta em: ${fmtDate(t.createdAt)}\n` +
-      `Status atual: ${STATUS_LABEL[t.status]||t.status}`
-    );
-    try { await updateDoc(doc(db,'tickets',t.id), {slowNotified:true}); }
-    catch(err){ console.error('Erro ao marcar O.S. como notificada:', err); }
-  }
-}
-
+// O disparo em si (nova O.S., O.S. demorada, troca aguardando aprovação) roda do lado
+// do servidor, nas Cloud Functions (pasta functions/) — funciona mesmo sem ninguém com
+// o sistema aberto no navegador. Aqui só fica a tela de configuração dos destinatários.
 function renderWhatsappSettings(){
   const list = document.getElementById('whatsappRecipientsList');
   if(!list) return;
