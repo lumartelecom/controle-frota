@@ -192,11 +192,13 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 .badge-em-manutencao{background:#F4E9FE; color:#7A2FC7;}
 .badge-sinistrado{background:#FDEAEA; color:#B8202B;}
 .badge-reserva{background:#F1F2F4; color:#5B6270;}
+.badge-alerta{background:#FFF4E0; color:#B8720A;}
 :root[data-theme="dark"] .badge-disponivel{background:#0F2A1C; color:#4ADE80;}
 :root[data-theme="dark"] .badge-em-uso{background:#10233F; color:#7CB0FF;}
 :root[data-theme="dark"] .badge-em-manutencao{background:#2B1740; color:#C89CF5;}
 :root[data-theme="dark"] .badge-sinistrado{background:#3A1216; color:#FF8A93;}
 :root[data-theme="dark"] .badge-reserva{background:#23262F; color:#A0A6B2;}
+:root[data-theme="dark"] .badge-alerta{background:#3A2A0F; color:#FFC069;}
 
 .pri-tag{display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;}
 .pri-tag::before{content:''; width:8px; height:8px; border-radius:2px;}
@@ -327,12 +329,30 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 }
 
 /* ============ PRINT (Ordem de Serviço) ============ */
-#printArea{color:#111; background:#fff;}
+#printArea{color:#111; background:#fff; font-family:'Inter',Arial,sans-serif;}
 #printArea h1{font-size:20px; margin-bottom:4px;}
 #printArea h3{font-size:14px; margin:16px 0 6px;}
 #printArea p{font-size:13px; line-height:1.5;}
 #printArea .print-photos{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;}
 #printArea .print-photos img{width:140px; height:auto; border:1px solid #ccc; border-radius:4px;}
+#printArea .po-header{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #E30613; padding-bottom:14px; margin-bottom:18px;}
+#printArea .po-brand{display:flex; align-items:center; gap:12px;}
+#printArea .po-mark{width:44px; height:44px; border-radius:10px; background:#E30613; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:18px; flex-shrink:0;}
+#printArea .po-brand-name{font-size:17px; font-weight:700;}
+#printArea .po-brand-tag{font-size:11px; color:#666; text-transform:uppercase; letter-spacing:.06em;}
+#printArea .po-title{text-align:right;}
+#printArea .po-title h1{margin:0 0 2px;}
+#printArea .po-number{font-size:13px; color:#666;}
+#printArea .info-grid{display:grid; grid-template-columns:1fr 1fr; border:1px solid #ccc; border-radius:8px; margin-bottom:16px; overflow:hidden;}
+#printArea .info-cell{padding:9px 14px; border-bottom:1px solid #eee;}
+#printArea .info-cell:nth-child(odd){border-right:1px solid #eee;}
+#printArea .info-label{font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#888; margin-bottom:2px;}
+#printArea .info-value{font-size:13.5px; font-weight:600;}
+#printArea .box{border:1px solid #ccc; border-radius:8px; padding:12px 14px; margin-bottom:16px;}
+#printArea .box-head{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#444; margin-bottom:6px;}
+#printArea .signatures{display:flex; gap:30px; margin-top:44px;}
+#printArea .sig-line{flex:1; border-top:1px solid #333; padding-top:6px; font-size:11.5px; color:#555; text-align:center;}
+#printArea .po-footer{margin-top:24px; font-size:10.5px; color:#999; text-align:center;}
 @media print{
   body *{visibility:hidden;}
   #printArea, #printArea *{visibility:visible;}
@@ -769,6 +789,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <option value="AFONSO">Frota Afonso</option>
           </select>
         </div>
+        <div class="field"><label>Número de frota</label><input id="vhFleetNumber" placeholder="Ex.: 12"></div>
         <div class="field">
           <label>Status</label>
           <select id="vhStatus">
@@ -781,6 +802,8 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
         </div>
         <div class="field"><label>Motorista</label><select id="vhDriver"><option value="">— Nenhum —</option></select></div>
         <div class="field full"><label>Centro de custo</label><input id="vhCostCenter"></div>
+        <div class="field full"><label>Validade do CRLV</label><input id="vhCrlvValidity" type="date"></div>
+        <div class="field full"><label>Próxima revisão (KM)</label><input id="vhNextMaintenanceKm" type="number" min="0" placeholder="Ex.: 90000"></div>
         <div class="field full"><label>Foto do veículo</label><input type="file" id="vhPhoto" accept="image/*"></div>
       </div>
     </div>
@@ -801,6 +824,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
       <input type="file" id="vdPhotoFileInput" accept="image/*" class="hidden">
       <div id="vdMeta" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:center;"></div>
       <div id="vdInfoGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13.5px; margin-bottom:16px;"></div>
+      <div id="vdDriverHistoryWrap" style="margin-bottom:16px;"></div>
       <div id="vdSwapHistoryWrap"></div>
     </div>
     <div class="modal-foot" id="vdFoot"></div>
@@ -886,6 +910,8 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
       <div id="ddInfoGrid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13.5px; margin-bottom:18px;"></div>
       <h4 style="font-size:13px; margin-bottom:8px;">Vistorias realizadas</h4>
       <div id="ddInspections" style="margin-bottom:18px;"></div>
+      <h4 style="font-size:13px; margin-bottom:8px;">Histórico de veículos (por período)</h4>
+      <div id="ddVehicleHistory" style="margin-bottom:18px;"></div>
       <h4 style="font-size:13px; margin-bottom:8px;">Histórico de trocas de veículo</h4>
       <div id="ddSwaps"></div>
     </div>
@@ -1259,6 +1285,7 @@ let drivers = [];
 let tickets = [];
 let inspections = [];
 let vehicleSwaps = [];
+let driverAssignments = [];
 let myVehicle = null;
 let myTickets = [];
 let myInspections = [];
@@ -1347,8 +1374,54 @@ function driverName(id){
   const d = drivers.find(x=>x.id===id);
   return d ? d.name : '—';
 }
+
+// Histórico de vínculo motorista<->veículo, por período (início/fim). Toda vez que o
+// driverId de um veículo muda (edição direta, troca rápida do staff ou aprovação de
+// troca), fecha o período aberto anterior (se tinha) e abre um novo pro motorista atual.
+// Assim dá pra consultar depois quem estava com a placa X numa data qualquer.
+function closeDriverAssignment(batch, vehicleId, driverId){
+  if(!driverId) return;
+  const active = driverAssignments.find(a=>a.vehicleId===vehicleId && a.driverId===driverId && !a.endedAt);
+  if(active) batch.update(doc(db,'driverAssignments',active.id), {endedAt: Date.now()});
+}
+function openDriverAssignment(batch, vehicleId, vehiclePlate, driverId){
+  if(!driverId) return;
+  batch.set(doc(collection(db,'driverAssignments')), {
+    vehicleId, vehiclePlate, driverId, driverName: driverName(driverId),
+    startedAt: Date.now(), endedAt: null, startedBy: currentUser.name,
+  });
+}
+// Chamar sempre que o driverId de um veículo mudar (de oldDriverId pra newDriverId).
+function updateDriverAssignment(batch, vehicleId, vehiclePlate, oldDriverId, newDriverId){
+  if(oldDriverId === newDriverId) return;
+  if(oldDriverId) closeDriverAssignment(batch, vehicleId, oldDriverId);
+  if(newDriverId) openDriverAssignment(batch, vehicleId, vehiclePlate, newDriverId);
+}
 function isCnhExpired(d){
   return !!(d.cnhValidity && new Date(d.cnhValidity) < new Date());
+}
+
+// Alertas preventivos do veículo: documentos vencendo/vencidos e revisão por KM.
+// 'danger' = já vencido/atrasado; 'alerta' = vencendo/se aproximando (30 dias / 1.000km).
+function vehicleAlerts(v){
+  const alerts = [];
+  const today = new Date();
+  const in30days = new Date(Date.now() + 30*864e5);
+  const checkDate = (dateStr, label) => {
+    if(!dateStr) return;
+    const d = new Date(dateStr+'T00:00:00');
+    if(d < today) alerts.push({label:`${label} vencido`, level:'danger'});
+    else if(d < in30days) alerts.push({label:`${label} vencendo`, level:'alerta'});
+  };
+  checkDate(v.crlvValidity, 'CRLV');
+  if(v.nextMaintenanceKm && v.km){
+    if(v.km >= v.nextMaintenanceKm) alerts.push({label:'Revisão atrasada', level:'danger'});
+    else if(v.km >= v.nextMaintenanceKm - 1000) alerts.push({label:'Revisão próxima', level:'alerta'});
+  }
+  return alerts;
+}
+function vehicleAlertBadgesHtml(v){
+  return vehicleAlerts(v).map(a=>`<span class="badge badge-${a.level==='danger'?'sinistrado':'alerta'}">${escapeHtml(a.label)}</span>`).join('');
 }
 function populateDriverSelects(){
   const optionalOptions = '<option value="">— Nenhum —</option>' + drivers.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
@@ -1550,6 +1623,10 @@ function attachStaffListeners(){
   unsubscribers.push(onSnapshot(collection(db,'vehicleSwaps'), snap=>{
     vehicleSwaps = snap.docs.map(d=>({id:d.id, ...d.data()}));
   }, err=>toast('Erro lendo trocas: '+err.message, 'err')));
+
+  unsubscribers.push(onSnapshot(collection(db,'driverAssignments'), snap=>{
+    driverAssignments = snap.docs.map(d=>({id:d.id, ...d.data()}));
+  }, err=>toast('Erro lendo histórico de motoristas: '+err.message, 'err')));
 
   unsubscribers.push(onSnapshot(collection(db,'swapRequests'), snap=>{
     swapRequests = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -2031,6 +2108,7 @@ document.getElementById('btnSaveDriverInspection').addEventListener('click', asy
 /* ============ TROCAS DE VEÍCULO — APROVAÇÃO (staff) ============ */
 function renderSwapRequests(){
   const statusFilter = document.getElementById('swapFilterStatus').value;
+  const isAdmin = currentUser.role === 'admin';
   let filtered = swapRequests.filter(s => !statusFilter || s.status===statusFilter);
   filtered = sortRows(filtered, tableSortState.trocas, {
     date: s=>s.createdAt||0, driver: s=>s.driverName||driverName(s.driverId),
@@ -2043,6 +2121,7 @@ function renderSwapRequests(){
   document.getElementById('swapThead').innerHTML = `<tr>
     ${sortableTh('trocas','date','Data')}${sortableTh('trocas','driver','Motorista')}${sortableTh('trocas','from','De')}
     ${sortableTh('trocas','to','Para')}${sortableTh('trocas','status','Status')}${sortableTh('trocas','decidedBy','Decidido por')}
+    <th class="admin-only-col ${isAdmin?'':'hidden'}">Ações</th>
   </tr>`;
   document.getElementById('swapTbody').innerHTML = paginateRows('trocas', filtered).map(s=>`
     <tr class="row-click" onclick="openSwapApprovalDetail('${s.id}')">
@@ -2052,10 +2131,24 @@ function renderSwapRequests(){
       <td><span class="plate">${escapeHtml(s.toPlate)}</span></td>
       <td><span class="badge badge-${s.status==='APROVADA'?'disponivel':s.status==='REPROVADA'?'sinistrado':'reserva'}">${SWAP_STATUS_LABEL[s.status]||s.status}</span></td>
       <td>${escapeHtml(s.decidedBy||'—')}</td>
+      ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteSwapRequest('${s.id}')">Excluir</button></td>` : ''}
     </tr>`).join('');
   renderPaginationBar('trocas', 'swapPagination', filtered.length, renderSwapRequests);
 }
 document.getElementById('swapFilterStatus').addEventListener('change', ()=>{ tablePageState.trocas=1; renderSwapRequests(); });
+
+async function deleteSwapRequest(id){
+  const s = swapRequests.find(x=>x.id===id);
+  if(!s) return;
+  if(!confirm(`Excluir a solicitação de troca ${s.fromPlate} → ${s.toPlate}? Esta ação não pode ser desfeita.`)) return;
+  try {
+    await deleteDoc(doc(db,'swapRequests',id));
+    toast('Solicitação de troca excluída.', 'ok');
+  } catch(err){
+    toast('Erro ao excluir solicitação: '+err.message, 'err');
+  }
+}
+window.deleteSwapRequest = deleteSwapRequest;
 
 function inspectionSummaryHtml(insp){
   if(!insp) return '<div class="empty-state" style="padding:18px;"><div class="ic">📋</div>Vistoria ainda não realizada.</div>';
@@ -2135,16 +2228,19 @@ async function approveSwapRequest(s){
     batch.update(doc(db,'swapRequests',s.id), {
       status:'APROVADA', decidedBy: currentUser.name, decidedAt: Date.now(), decisionNotes: '',
     });
+    const fromVehicle = vehicles.find(v=>v.id===s.fromVehicleId);
     batch.update(doc(db,'vehicles',s.fromVehicleId), {
       status: s.reason==='Manutenção' ? 'em-manutencao' : (s.reason==='Sinistro' ? 'sinistrado' : 'reserva'),
       driverId: null,
     });
+    updateDriverAssignment(batch, s.fromVehicleId, s.fromPlate, fromVehicle?.driverId||null, null);
     const toVehicle = vehicles.find(v=>v.id===s.toVehicleId);
     const toDriverChanged = s.driverId && s.driverId !== (toVehicle?.driverId || null);
     batch.update(doc(db,'vehicles',s.toVehicleId), {
       status: 'em-uso', driverId: s.driverId,
       ...(toDriverChanged ? {pendingInspection: true} : {}),
     });
+    updateDriverAssignment(batch, s.toVehicleId, s.toPlate, toVehicle?.driverId||null, s.driverId);
     await batch.commit();
     toast('Troca aprovada e veículos atualizados.', 'ok');
     closeModal('modalSwapApprovalDetail');
@@ -2256,12 +2352,14 @@ function renderDashboard(){
   const disponiveis = vehicles.filter(v=>v.status==='disponivel').length;
   const abertos = tickets.filter(t=>t.status!=='CONCLUIDO').length;
   const concluidos = tickets.filter(t=>t.status==='CONCLUIDO').length;
+  const comAlerta = vehicles.filter(v=>vehicleAlerts(v).length>0).length;
 
   const cards = [
     {val: totalV, lbl:'Veículos na frota', view:'vehicles', accent:'var(--brand)', icon:'🚐'},
     {val: disponiveis, lbl:'Disponíveis', view:'vehicles', filter:'disponivel', accent:'var(--st-concluido)', icon:'✅'},
     {val: abertos, lbl:'Chamados abertos', view:'tickets', accent:'var(--st-alta)', icon:'🛠'},
     {val: concluidos, lbl:'Concluídos', view:'tickets', filter:'CONCLUIDO', accent:'var(--st-concluido)', icon:'🏁'},
+    {val: comAlerta, lbl:'Veículos c/ pendências', view:'vehicles', accent:'#B8720A', icon:'⚠️'},
   ];
   document.getElementById('kpiGrid').innerHTML = cards.map(c=>`
     <button type="button" class="kpi-card" style="--accent:${c.accent}" onclick="switchView('${c.view}', ${c.filter ? `'${c.filter}'` : 'null'})">
@@ -2357,7 +2455,7 @@ function renderVehicles(){
   let filtered = vehicles.filter(v =>
     (!statusFilter || v.status===statusFilter) &&
     (!fleetFilter || v.fleet===fleetFilter) &&
-    (!search || (v.plate||'').toLowerCase().includes(search) || (v.model||'').toLowerCase().includes(search))
+    (!search || (v.plate||'').toLowerCase().includes(search) || (v.model||'').toLowerCase().includes(search) || (v.fleetNumber||'').toLowerCase().includes(search))
   );
   filtered = sortRows(filtered, tableSortState.vehicles, {
     plate: v=>v.plate||'', model: v=>((v.brand?v.brand+' ':'')+(v.model||'')),
@@ -2375,9 +2473,9 @@ function renderVehicles(){
     <tr class="row-click" onclick="openVehicleDetail('${v.id}')">
       <td><span class="plate">${escapeHtml(v.plate)}</span></td>
       <td>${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</td>
-      <td>${FLEET_LABEL[v.fleet] || '—'}</td>
+      <td>${FLEET_LABEL[v.fleet] || '—'}${v.fleetNumber ? ` · Nº ${escapeHtml(v.fleetNumber)}` : ''}</td>
       <td class="mono">${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</td>
-      <td><span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span></td>
+      <td><span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span> ${vehicleAlertBadgesHtml(v)}</td>
       <td>${escapeHtml(driverName(v.driverId))}</td>
       ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteVehicle('${v.id}')">Excluir</button></td>` : ''}
     </tr>`).join('');
@@ -2419,9 +2517,12 @@ function openVehicleModal(id){
   document.getElementById('vhYear').value = v?.year || '';
   document.getElementById('vhKm').value = v?.km || '';
   document.getElementById('vhFleet').value = v?.fleet || 'LUMAR';
+  document.getElementById('vhFleetNumber').value = v?.fleetNumber || '';
   document.getElementById('vhStatus').value = v?.status || 'disponivel';
   document.getElementById('vhDriver').value = v?.driverId || '';
   document.getElementById('vhCostCenter').value = v?.costCenter || '';
+  document.getElementById('vhCrlvValidity').value = v?.crlvValidity || '';
+  document.getElementById('vhNextMaintenanceKm').value = v?.nextMaintenanceKm || '';
   document.getElementById('vhPhoto').value = '';
   openModal('modalVehicle');
 }
@@ -2458,14 +2559,24 @@ function openVehicleDetail(id){
   document.getElementById('vdMeta').innerHTML = `
     <span class="plate">${escapeHtml(v.plate)}</span>
     <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
-    <span style="font-size:12px; color:var(--ink-muted);">${FLEET_LABEL[v.fleet] || 'Sem frota definida'}</span>
+    ${vehicleAlertBadgesHtml(v)}
+    <span style="font-size:12px; color:var(--ink-muted);">${FLEET_LABEL[v.fleet] || 'Sem frota definida'}${v.fleetNumber ? ' · Nº '+escapeHtml(v.fleetNumber) : ''}</span>
   `;
   document.getElementById('vdInfoGrid').innerHTML = `
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Ano</div>${v.year || '—'}</div>
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Motorista</div>${v.driverId ? `<span class="row-click" style="cursor:pointer; text-decoration:underline;" onclick="closeModal('modalVehicleDetail'); openDriverDetail('${v.driverId}')">${escapeHtml(driverName(v.driverId))}</span>` : '—'}</div>
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Centro de custo</div>${escapeHtml(v.costCenter||'—')}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Validade do CRLV</div>${v.crlvValidity ? new Date(v.crlvValidity+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Próxima revisão</div>${v.nextMaintenanceKm ? Number(v.nextMaintenanceKm).toLocaleString('pt-BR')+' km' : '—'}</div>
   `;
+  const vehicleHistory = driverAssignments.filter(a=>a.vehicleId===id).sort((a,b)=>b.startedAt-a.startedAt);
+  document.getElementById('vdDriverHistoryWrap').innerHTML = vehicleHistory.length ? `
+    <h4 style="font-size:13px; margin-bottom:8px;">Histórico de motoristas (por período)</h4>
+    <ul class="timeline">
+      ${vehicleHistory.map(a=>`<li><div class="dot"></div><div><div>${escapeHtml(a.driverName||driverName(a.driverId))} ${a.endedAt ? '' : '<span class="badge badge-disponivel">Atual</span>'}</div>
+      <div class="meta">${fmtDate(a.startedAt)} — ${a.endedAt ? fmtDate(a.endedAt) : 'até agora'}</div></div></li>`).join('')}
+    </ul>` : '';
   const swaps = vehicleSwaps.filter(s=>s.fromVehicleId===id || s.toVehicleId===id).sort((a,b)=>b.createdAt-a.createdAt);
   document.getElementById('vdSwapHistoryWrap').innerHTML = swaps.length ? `
     <h4 style="font-size:13px; margin-bottom:8px;">Histórico de trocas</h4>
@@ -2531,26 +2642,38 @@ document.getElementById('btnSaveVehicle').addEventListener('click', async ()=>{
   setBtnLoading('btnSaveVehicle', true, 'Enviando…');
   try {
     const existingVehicle = id ? vehicles.find(v=>v.id===id) : null;
+    const oldDriverId = existingVehicle?.driverId || null;
     const driverIdVal = document.getElementById('vhDriver').value || null;
-    const driverChanged = driverIdVal && driverIdVal !== (existingVehicle?.driverId || null);
+    const driverChanged = driverIdVal && driverIdVal !== oldDriverId;
     const payload = {
       plate, model,
       brand: document.getElementById('vhBrand').value.trim(),
       year: Number(document.getElementById('vhYear').value) || null,
       km: Number(document.getElementById('vhKm').value) || 0,
       fleet: document.getElementById('vhFleet').value,
+      fleetNumber: document.getElementById('vhFleetNumber').value.trim(),
       status: document.getElementById('vhStatus').value,
       driverId: driverIdVal,
       costCenter: document.getElementById('vhCostCenter').value.trim(),
+      crlvValidity: document.getElementById('vhCrlvValidity').value || null,
+      nextMaintenanceKm: Number(document.getElementById('vhNextMaintenanceKm').value) || null,
     };
     if(driverChanged) payload.pendingInspection = true;
     const file = document.getElementById('vhPhoto').files[0];
     if(file) payload.photoURL = await processPhoto(file, 'veiculos');
     if(id){
-      await updateDoc(doc(db,'vehicles',id), payload);
+      const batch = writeBatch(db);
+      batch.update(doc(db,'vehicles',id), payload);
+      updateDriverAssignment(batch, id, plate, oldDriverId, driverIdVal);
+      await batch.commit();
     } else {
       payload.photoURL = payload.photoURL || vehiclePlaceholderPhoto(payload);
-      await addDoc(collection(db,'vehicles'), payload);
+      const ref = await addDoc(collection(db,'vehicles'), payload);
+      if(driverIdVal){
+        const batch = writeBatch(db);
+        openDriverAssignment(batch, ref.id, plate, driverIdVal);
+        await batch.commit();
+      }
     }
     toast('Veículo salvo.', 'ok');
     closeModal('modalVehicle');
@@ -2699,6 +2822,13 @@ function openDriverDetail(id){
       <td><span class="result-pill res-${i.result}">${RESULT_LABEL[i.result]}</span></td>
     </tr>`).join('')}</tbody></table>` : '<div style="font-size:12.5px; color:var(--ink-faint);">Nenhuma vistoria registrada por este motorista.</div>';
 
+  const driverHistory = driverAssignments.filter(a=>a.driverId===d.id).sort((a,b)=>b.startedAt-a.startedAt);
+  document.getElementById('ddVehicleHistory').innerHTML = driverHistory.length ? `
+    <ul class="timeline">
+      ${driverHistory.map(a=>`<li><div class="dot"></div><div><div><span class="plate">${escapeHtml(a.vehiclePlate)}</span> ${a.endedAt ? '' : '<span class="badge badge-disponivel">Atual</span>'}</div>
+      <div class="meta">${fmtDate(a.startedAt)} — ${a.endedAt ? fmtDate(a.endedAt) : 'até agora'}</div></div></li>`).join('')}
+    </ul>` : '<div style="font-size:12.5px; color:var(--ink-faint);">Nenhum vínculo com veículo registrado ainda.</div>';
+
   const driverSwaps = vehicleSwaps.filter(s=>s.driverId===d.id).sort((a,b)=>b.createdAt-a.createdAt);
   document.getElementById('ddSwaps').innerHTML = driverSwaps.length ? `
     <ul class="timeline">
@@ -2770,6 +2900,7 @@ document.getElementById('btnSaveVehicleSwap').addEventListener('click', async ()
       status: reason==='Manutenção' ? 'em-manutencao' : (reason==='Sinistro' ? 'sinistrado' : 'reserva'),
       driverId: null,
     });
+    updateDriverAssignment(batch, fromId, fromVehicle.plate, fromVehicle.driverId||null, null);
     const toDriverId = driverId || toVehicle.driverId || null;
     const toDriverChanged = toDriverId && toDriverId !== (toVehicle.driverId || null);
     batch.update(doc(db,'vehicles',toId), {
@@ -2777,6 +2908,7 @@ document.getElementById('btnSaveVehicleSwap').addEventListener('click', async ()
       driverId: toDriverId,
       ...(toDriverChanged ? {pendingInspection: true} : {}),
     });
+    updateDriverAssignment(batch, toId, toVehicle.plate, toVehicle.driverId||null, toDriverId);
     await batch.commit();
     toast(`Troca registrada: ${fromVehicle.plate} → ${toVehicle.plate}.`, 'ok');
     closeModal('modalVehicleSwap');
@@ -3246,19 +3378,59 @@ document.getElementById('btnConfirmCloseTicket').addEventListener('click', async
 });
 
 function printTicket(t){
+  const vehicle = vehicles.find(v=>v.id===t.vehicleId);
+  const modelText = vehicle ? ((vehicle.brand?vehicle.brand+' ':'')+(vehicle.model||'')) : '—';
+  const frotaText = vehicle ? (FLEET_LABEL[vehicle.fleet]||'—') + (vehicle.fleetNumber ? ' · Nº '+vehicle.fleetNumber : '') : '—';
+  const driverLabel = vehicle && vehicle.driverId ? driverName(vehicle.driverId) : '—';
+
   const closingHtml = t.status==='CONCLUIDO' ? `
-    <h3>Serviço executado</h3>
-    <p>${escapeHtml(t.closingDescription||'—')}</p>
-    ${(t.closingPhotos||[]).length ? `<div class="print-photos">${t.closingPhotos.map(p=>`<img src="${driveViewableUrl(p)}">`).join('')}</div>` : ''}
-    <p style="margin-top:10px;"><strong>Fechada em:</strong> ${fmtDate(t.closedAt)} por ${escapeHtml(t.closedBy||'—')}</p>
+    <div class="box">
+      <div class="box-head">🔧 Serviço executado</div>
+      <p>${escapeHtml(t.closingDescription||'—')}</p>
+      ${(t.closingPhotos||[]).length ? `<div class="print-photos">${t.closingPhotos.map(p=>`<img src="${driveViewableUrl(p)}">`).join('')}</div>` : ''}
+      <p style="margin-top:8px; font-size:11.5px; color:#666;"><strong>Fechada em:</strong> ${fmtDate(t.closedAt)} por ${escapeHtml(t.closedBy||'—')}</p>
+    </div>
   ` : '';
+
   document.getElementById('printArea').innerHTML = `
-    <h1>Ordem de Serviço ${escapeHtml(t.ticketNumber)}</h1>
-    <p><strong>Veículo:</strong> ${escapeHtml(t.vehiclePlate)} &nbsp; <strong>Prioridade:</strong> ${PRIORITY_LABEL[t.priority]} &nbsp; <strong>Status:</strong> ${STATUS_LABEL[t.status]}</p>
-    <p><strong>Aberta em:</strong> ${fmtDate(t.createdAt)} por ${escapeHtml(t.openedByName||'—')}</p>
-    <h3>Descrição do serviço</h3>
-    <p>${escapeHtml(t.description)}</p>
+    <div class="po-header">
+      <div class="po-brand">
+        <div class="po-mark">LT</div>
+        <div>
+          <div class="po-brand-name">Lumar Telecom</div>
+          <div class="po-brand-tag">Controle de Frota</div>
+        </div>
+      </div>
+      <div class="po-title">
+        <h1>Ordem de Serviço</h1>
+        <div class="po-number">${escapeHtml(t.ticketNumber)}</div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-cell"><div class="info-label">Veículo</div><div class="info-value">${escapeHtml(t.vehiclePlate)} — ${escapeHtml(modelText)}</div></div>
+      <div class="info-cell"><div class="info-label">Frota</div><div class="info-value">${escapeHtml(frotaText)}</div></div>
+      <div class="info-cell"><div class="info-label">Motorista</div><div class="info-value">${escapeHtml(driverLabel)}</div></div>
+      <div class="info-cell"><div class="info-label">Prioridade</div><div class="info-value">${PRIORITY_LABEL[t.priority]}</div></div>
+      <div class="info-cell"><div class="info-label">Status</div><div class="info-value">${STATUS_LABEL[t.status]}</div></div>
+      <div class="info-cell"><div class="info-label">Aberta em</div><div class="info-value">${fmtDate(t.createdAt)} · ${escapeHtml(t.openedByName||'—')}</div></div>
+    </div>
+
+    <div class="box">
+      <div class="box-head">📋 Descrição do serviço solicitado</div>
+      <p>${escapeHtml(t.description)}</p>
+      ${t.photoURL ? `<div class="print-photos"><img src="${driveViewableUrl(t.photoURL)}"></div>` : ''}
+    </div>
+
     ${closingHtml}
+
+    <div class="signatures">
+      <div class="sig-line">Mecânico responsável</div>
+      <div class="sig-line">Data / Hora</div>
+      <div class="sig-line">Assinatura</div>
+    </div>
+
+    <div class="po-footer">Documento gerado pelo sistema de Controle de Frota — Lumar Telecom · Impresso em ${fmtDate(Date.now())}</div>
   `;
   window.print();
 }
