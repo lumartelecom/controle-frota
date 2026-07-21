@@ -295,6 +295,10 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 @keyframes barSlide{0%{left:-40%;} 100%{left:100%;}}
 .btn[disabled]{opacity:.65; cursor:not-allowed;}
 
+/* ============ AVISO DE VISTORIA PENDENTE ============ */
+.alert-banner-danger{display:flex; align-items:center; gap:10px; padding:12px 14px; background:#FDEAEA; border:1px solid #F3B9BD; border-radius:8px; font-size:13.5px; color:#B8202B; margin-bottom:18px; font-weight:600;}
+:root[data-theme="dark"] .alert-banner-danger{background:#3A1216; border-color:#5C1E24; color:#FF8A93;}
+
 /* ============ MOLDURA DA FOTO DO VEÍCULO ============ */
 .vehicle-photo-frame{
   aspect-ratio:16/9; border-radius:12px; border:1px solid var(--border); background:var(--surface-alt);
@@ -1017,6 +1021,9 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <div class="photo-slot"><label>Lateral esquerda</label><input type="file" id="inspPhotoLatEsq" accept="image/*"></div>
             <div class="photo-slot"><label>Lateral direita</label><input type="file" id="inspPhotoLatDir" accept="image/*"></div>
             <div class="photo-slot"><label>Painel / KM</label><input type="file" id="inspPhotoPainel" accept="image/*"></div>
+            <div class="photo-slot"><label>Interior</label><input type="file" id="inspPhotoInterior" accept="image/*"></div>
+            <div class="photo-slot"><label>Bancos</label><input type="file" id="inspPhotoBancos" accept="image/*"></div>
+            <div class="photo-slot"><label>Estepe</label><input type="file" id="inspPhotoEstepe" accept="image/*"></div>
           </div>
         </div>
         <div class="field full"><label>Fotos adicionais / avarias (opcional, várias)</label><input type="file" id="inspExtraPhotos" accept="image/*" multiple></div>
@@ -1123,6 +1130,8 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <div class="photo-slot"><label>Lateral direita</label><input type="file" id="swInspPhotoLatDir" accept="image/*"></div>
             <div class="photo-slot"><label>Painel / Hodômetro</label><input type="file" id="swInspPhotoPainel" accept="image/*"></div>
             <div class="photo-slot"><label>Interior</label><input type="file" id="swInspPhotoInterior" accept="image/*"></div>
+            <div class="photo-slot"><label>Bancos</label><input type="file" id="swInspPhotoBancos" accept="image/*"></div>
+            <div class="photo-slot"><label>Estepe</label><input type="file" id="swInspPhotoEstepe" accept="image/*"></div>
           </div>
         </div>
 
@@ -1322,7 +1331,7 @@ const CHECKLIST_ITEMS = [
 ];
 const RESULT_LABEL = {APROVADO:'Aprovado', RESSALVAS:'Aprovado c/ ressalvas', REPROVADO:'Reprovado'};
 const CHECKLIST_STATUS_LABEL = {ok:'OK', problema:'Problema', na:'N/A'};
-const PHOTO_SLOT_LABEL = {frente:'Frente', traseira:'Traseira', lateralEsq:'Lateral esquerda', lateralDir:'Lateral direita', painel:'Painel / KM', interior:'Interior'};
+const PHOTO_SLOT_LABEL = {frente:'Frente', traseira:'Traseira', lateralEsq:'Lateral esquerda', lateralDir:'Lateral direita', painel:'Painel / KM', interior:'Interior', bancos:'Bancos', estepe:'Estepe'};
 const SWAP_STATUS_LABEL = {
   VISTORIA_PENDENTE:'Vistoria pendente', AGUARDANDO_APROVACAO:'Aguardando aprovação',
   AJUSTES:'Ajustes solicitados', APROVADA:'Aprovada', REPROVADA:'Reprovada',
@@ -1633,6 +1642,7 @@ function renderMeuCarro(){
   const activeSwap = getActiveSwapRequest();
   wrap.innerHTML = `
     <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
+    ${v.pendingInspection ? `<div class="alert-banner-danger">⚠️ Seu veículo precisa passar por uma vistoria. Aguarde o contato do administrativo ou procure a equipe de manutenção.</div>` : ''}
     <div class="panel">
       <div style="padding:16px 16px 0;">${vehiclePhotoFrameHtml(photo)}</div>
       <div style="padding:18px 20px;">
@@ -1683,6 +1693,7 @@ function renderMeuVeiculo(){
   const photo = vehicleDisplayPhoto(v, myInspections);
   const allTix = [...myTickets].sort((a,b)=>b.createdAt-a.createdAt);
   wrap.innerHTML = `
+    ${v.pendingInspection ? `<div class="alert-banner-danger">⚠️ Seu veículo precisa passar por uma vistoria. Aguarde o contato do administrativo ou procure a equipe de manutenção.</div>` : ''}
     <div class="panel" style="margin-bottom:20px;">
       <div style="padding:16px 16px 0;">${vehiclePhotoFrameHtml(photo)}</div>
       <div style="padding:18px 20px;">
@@ -1824,7 +1835,7 @@ function openSwapInspectionModal(s, leg){
     obs.value = '';
     obs.classList.add('hidden');
   });
-  ['swInspPhotoFrente','swInspPhotoTraseira','swInspPhotoLatEsq','swInspPhotoLatDir','swInspPhotoPainel','swInspPhotoInterior'].forEach(id=>{
+  ['swInspPhotoFrente','swInspPhotoTraseira','swInspPhotoLatEsq','swInspPhotoLatDir','swInspPhotoPainel','swInspPhotoInterior','swInspPhotoBancos','swInspPhotoEstepe'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   openModal('modalSwapInspection');
@@ -1852,7 +1863,7 @@ document.getElementById('btnSaveSwapInspection').addEventListener('click', async
 
     const { swapRequestId, leg, vehicleId, plate } = currentSwapLeg;
     const subfolder = driveVehicleFolder('VISTORIAS', plate, currentUser.name);
-    const photoSlotIds = {frente:'swInspPhotoFrente', traseira:'swInspPhotoTraseira', lateralEsq:'swInspPhotoLatEsq', lateralDir:'swInspPhotoLatDir', painel:'swInspPhotoPainel', interior:'swInspPhotoInterior'};
+    const photoSlotIds = {frente:'swInspPhotoFrente', traseira:'swInspPhotoTraseira', lateralEsq:'swInspPhotoLatEsq', lateralDir:'swInspPhotoLatDir', painel:'swInspPhotoPainel', interior:'swInspPhotoInterior', bancos:'swInspPhotoBancos', estepe:'swInspPhotoEstepe'};
     const photos = {};
     for(const [key, id] of Object.entries(photoSlotIds)){
       const file = document.getElementById(id).files[0];
@@ -2395,6 +2406,9 @@ document.getElementById('btnSaveVehicle').addEventListener('click', async ()=>{
   if(!plate || !model){ toast('Placa e modelo são obrigatórios.', 'err'); return; }
   setBtnLoading('btnSaveVehicle', true, 'Enviando…');
   try {
+    const existingVehicle = id ? vehicles.find(v=>v.id===id) : null;
+    const driverIdVal = document.getElementById('vhDriver').value || null;
+    const driverChanged = driverIdVal && driverIdVal !== (existingVehicle?.driverId || null);
     const payload = {
       plate, model,
       brand: document.getElementById('vhBrand').value.trim(),
@@ -2402,9 +2416,10 @@ document.getElementById('btnSaveVehicle').addEventListener('click', async ()=>{
       km: Number(document.getElementById('vhKm').value) || 0,
       fleet: document.getElementById('vhFleet').value,
       status: document.getElementById('vhStatus').value,
-      driverId: document.getElementById('vhDriver').value || null,
+      driverId: driverIdVal,
       costCenter: document.getElementById('vhCostCenter').value.trim(),
     };
+    if(driverChanged) payload.pendingInspection = true;
     const file = document.getElementById('vhPhoto').files[0];
     if(file) payload.photoURL = await processPhoto(file, 'veiculos');
     if(id){
@@ -2631,9 +2646,12 @@ document.getElementById('btnSaveVehicleSwap').addEventListener('click', async ()
       status: reason==='Manutenção' ? 'em-manutencao' : (reason==='Sinistro' ? 'sinistrado' : 'reserva'),
       driverId: null,
     });
+    const toDriverId = driverId || toVehicle.driverId || null;
+    const toDriverChanged = toDriverId && toDriverId !== (toVehicle.driverId || null);
     batch.update(doc(db,'vehicles',toId), {
       status: 'em-uso',
-      driverId: driverId || toVehicle.driverId || null,
+      driverId: toDriverId,
+      ...(toDriverChanged ? {pendingInspection: true} : {}),
     });
     await batch.commit();
     toast(`Troca registrada: ${fromVehicle.plate} → ${toVehicle.plate}.`, 'ok');
@@ -2715,7 +2733,7 @@ document.getElementById('btnNewInspection').addEventListener('click', ()=>{
     obs.value = '';
     obs.classList.add('hidden');
   });
-  ['inspPhotoFrente','inspPhotoTraseira','inspPhotoLatEsq','inspPhotoLatDir','inspPhotoPainel','inspExtraPhotos'].forEach(id=>{
+  ['inspPhotoFrente','inspPhotoTraseira','inspPhotoLatEsq','inspPhotoLatDir','inspPhotoPainel','inspPhotoInterior','inspPhotoBancos','inspPhotoEstepe','inspExtraPhotos'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   document.getElementById('inspRetido').checked = false;
@@ -2756,7 +2774,7 @@ document.getElementById('btnSaveInspection').addEventListener('click', async ()=
     const inspDriverLabel = driverName(driverId);
     const inspSubfolder = driveVehicleFolder('VISTORIAS', vehicle?.plate, inspDriverLabel);
 
-    const photoSlotIds = {frente:'inspPhotoFrente', traseira:'inspPhotoTraseira', lateralEsq:'inspPhotoLatEsq', lateralDir:'inspPhotoLatDir', painel:'inspPhotoPainel'};
+    const photoSlotIds = {frente:'inspPhotoFrente', traseira:'inspPhotoTraseira', lateralEsq:'inspPhotoLatEsq', lateralDir:'inspPhotoLatDir', painel:'inspPhotoPainel', interior:'inspPhotoInterior', bancos:'inspPhotoBancos', estepe:'inspPhotoEstepe'};
     const photos = {};
     for(const [key, id] of Object.entries(photoSlotIds)){
       const file = document.getElementById(id).files[0];
@@ -2808,9 +2826,11 @@ document.getElementById('btnSaveInspection').addEventListener('click', async ()=
       generatedTickets
     });
 
+    const vehicleUpdate = {pendingInspection: false};
     if(result==='REPROVADO' && vehicle && vehicle.status!=='em-manutencao'){
-      batch.update(doc(db,'vehicles',vehicleId), {status:'em-manutencao'});
+      vehicleUpdate.status = 'em-manutencao';
     }
+    batch.update(doc(db,'vehicles',vehicleId), vehicleUpdate);
 
     await batch.commit();
     toast(`Vistoria registrada — resultado: ${RESULT_LABEL[result]}.` + (generatedTickets.length ? ` ${generatedTickets.length} O.S. gerada(s) automaticamente.` : ''), result==='REPROVADO' ? 'err' : 'ok');
