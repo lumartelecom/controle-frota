@@ -296,7 +296,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 .btn[disabled]{opacity:.65; cursor:not-allowed;}
 
 /* ============ AVISO DE VISTORIA PENDENTE ============ */
-.alert-banner-danger{display:flex; align-items:center; gap:10px; padding:12px 14px; background:#FDEAEA; border:1px solid #F3B9BD; border-radius:8px; font-size:13.5px; color:#B8202B; margin-bottom:18px; font-weight:600;}
+.alert-banner-danger{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:12px 14px; background:#FDEAEA; border:1px solid #F3B9BD; border-radius:8px; font-size:13.5px; color:#B8202B; margin-bottom:18px; font-weight:600;}
 :root[data-theme="dark"] .alert-banner-danger{background:#3A1216; border-color:#5C1E24; color:#FF8A93;}
 
 /* ============ MOLDURA DA FOTO DO VEÍCULO ============ */
@@ -1150,6 +1150,48 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
   </div>
 </div>
 
+<!-- ============ MODAL: VISTORIA PENDENTE (motorista faz por conta própria) ============ -->
+<div class="modal-backdrop hidden" id="modalDriverInspection">
+  <div class="modal-box wide">
+    <div class="modal-head"><h3>Fazer vistoria do veículo</h3><button class="modal-close" data-close="modalDriverInspection">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field"><label>KM atual *</label><input id="pvInspKm" type="number" min="0" required></div>
+
+        <div class="field full">
+          <label>Checklist de itens</label>
+          <div id="pvInspChecklist"></div>
+        </div>
+
+        <div class="field full">
+          <label>Fotos da vistoria</label>
+          <div class="photo-slots">
+            <div class="photo-slot"><label>Frente</label><input type="file" id="pvInspPhotoFrente" accept="image/*"></div>
+            <div class="photo-slot"><label>Traseira</label><input type="file" id="pvInspPhotoTraseira" accept="image/*"></div>
+            <div class="photo-slot"><label>Lateral esquerda</label><input type="file" id="pvInspPhotoLatEsq" accept="image/*"></div>
+            <div class="photo-slot"><label>Lateral direita</label><input type="file" id="pvInspPhotoLatDir" accept="image/*"></div>
+            <div class="photo-slot"><label>Painel / KM</label><input type="file" id="pvInspPhotoPainel" accept="image/*"></div>
+            <div class="photo-slot"><label>Interior</label><input type="file" id="pvInspPhotoInterior" accept="image/*"></div>
+            <div class="photo-slot"><label>Bancos</label><input type="file" id="pvInspPhotoBancos" accept="image/*"></div>
+            <div class="photo-slot"><label>Estepe</label><input type="file" id="pvInspPhotoEstepe" accept="image/*"></div>
+          </div>
+        </div>
+
+        <div class="field full"><label>Observações gerais</label><textarea id="pvInspObservations" rows="3" style="width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:8px; background:var(--surface-alt); color:var(--ink);"></textarea></div>
+      </div>
+      <div class="upload-banner hidden" id="pvInspUploadingBanner">
+        <span class="spinner"></span>
+        <span>Enviando fotos e registrando a vistoria, aguarde…</span>
+        <div class="bar-track"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalDriverInspection">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveDriverInspection">Concluir vistoria</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL: APROVAÇÃO DE TROCA (staff) ============ -->
 <div class="modal-backdrop hidden" id="modalSwapApprovalDetail">
   <div class="modal-box wide">
@@ -1642,7 +1684,10 @@ function renderMeuCarro(){
   const activeSwap = getActiveSwapRequest();
   wrap.innerHTML = `
     <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
-    ${v.pendingInspection ? `<div class="alert-banner-danger">⚠️ Seu veículo precisa passar por uma vistoria. Aguarde o contato do administrativo ou procure a equipe de manutenção.</div>` : ''}
+    ${v.pendingInspection ? `<div class="alert-banner-danger">
+      <span>⚠️ Seu veículo precisa passar por uma vistoria.</span>
+      <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" id="btnFazerVistoriaPendente">Fazer vistoria</button>
+    </div>` : ''}
     <div class="panel">
       <div style="padding:16px 16px 0;">${vehiclePhotoFrameHtml(photo)}</div>
       <div style="padding:18px 20px;">
@@ -1653,8 +1698,8 @@ function renderMeuCarro(){
         <div style="font-size:15px; font-weight:600; margin-bottom:4px;">${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</div>
         <div style="font-size:13px; color:var(--ink-muted);">KM atual: ${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:16px;">
-          <button type="button" class="btn btn-primary btn-sm" id="btnMeuCarroAbrirOS">+ Abrir O.S</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="btnSolicitarTroca">🔄 ${activeSwap ? 'Acompanhar solicitação de troca' : 'Solicitar troca de veículo'}</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnMeuCarroAbrirOS">Abrir Manutenção</button>
+          <button type="button" class="btn btn-primary btn-sm" id="btnSolicitarTroca">🔄 ${activeSwap ? 'Acompanhar solicitação de troca' : 'Solicitar troca de veículo'}</button>
           ${activeSwap ? `<span style="font-size:12px; color:var(--ink-muted);">${SWAP_STATUS_LABEL[activeSwap.status]||activeSwap.status}</span>` : ''}
         </div>
       </div>
@@ -1666,6 +1711,8 @@ function renderMeuCarro(){
     if(active) openSwapProgressModal(active.id);
     else openSwapRequestModal();
   });
+  const btnVistoria = document.getElementById('btnFazerVistoriaPendente');
+  if(btnVistoria) btnVistoria.addEventListener('click', openDriverInspectionModal);
 }
 
 function renderMinhasOS(){
@@ -1693,7 +1740,10 @@ function renderMeuVeiculo(){
   const photo = vehicleDisplayPhoto(v, myInspections);
   const allTix = [...myTickets].sort((a,b)=>b.createdAt-a.createdAt);
   wrap.innerHTML = `
-    ${v.pendingInspection ? `<div class="alert-banner-danger">⚠️ Seu veículo precisa passar por uma vistoria. Aguarde o contato do administrativo ou procure a equipe de manutenção.</div>` : ''}
+    ${v.pendingInspection ? `<div class="alert-banner-danger">
+      <span>⚠️ Seu veículo precisa passar por uma vistoria.</span>
+      <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" id="btnFazerVistoriaPendenteMV">Fazer vistoria</button>
+    </div>` : ''}
     <div class="panel" style="margin-bottom:20px;">
       <div style="padding:16px 16px 0;">${vehiclePhotoFrameHtml(photo)}</div>
       <div style="padding:18px 20px;">
@@ -1726,6 +1776,8 @@ function renderMeuVeiculo(){
       </table></div>
     </div>
   `;
+  const btnVistoriaMV = document.getElementById('btnFazerVistoriaPendenteMV');
+  if(btnVistoriaMV) btnVistoriaMV.addEventListener('click', openDriverInspectionModal);
 }
 
 function renderMinhasTrocas(){
@@ -1907,6 +1959,75 @@ document.getElementById('btnSaveSwapInspection').addEventListener('click', async
   }
 });
 
+function openDriverInspectionModal(){
+  if(!myVehicle) return;
+  renderChecklistInto('pvInspChecklist', 'pv');
+  document.getElementById('pvInspKm').value = '';
+  document.getElementById('pvInspObservations').value = '';
+  ['pvInspPhotoFrente','pvInspPhotoTraseira','pvInspPhotoLatEsq','pvInspPhotoLatDir','pvInspPhotoPainel','pvInspPhotoInterior','pvInspPhotoBancos','pvInspPhotoEstepe'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  openModal('modalDriverInspection');
+}
+window.openDriverInspectionModal = openDriverInspectionModal;
+
+document.getElementById('btnSaveDriverInspection').addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnSaveDriverInspection');
+  if(btn.disabled) return;
+  if(!myVehicle) return;
+  const kmRaw = document.getElementById('pvInspKm').value;
+  if(!kmRaw){ toast('Informe a quilometragem.', 'err'); return; }
+  setBtnLoading('btnSaveDriverInspection', true, 'Enviando…', 'pvInspUploadingBanner');
+  try {
+    const km = Number(kmRaw);
+    const observations = document.getElementById('pvInspObservations').value.trim();
+    const checklist = [];
+    let hasProblem = false;
+    CHECKLIST_ITEMS.forEach(item=>{
+      const status = document.getElementById('pvchk_'+item.key).value;
+      const obs = document.getElementById('pvchkobs_'+item.key).value.trim();
+      if(status==='problema') hasProblem = true;
+      checklist.push({...item, status, obs});
+    });
+    const result = hasProblem ? 'RESSALVAS' : 'APROVADO';
+
+    const subfolder = driveVehicleFolder('VISTORIAS', myVehicle.plate, currentUser.name);
+    const photoSlotIds = {frente:'pvInspPhotoFrente', traseira:'pvInspPhotoTraseira', lateralEsq:'pvInspPhotoLatEsq', lateralDir:'pvInspPhotoLatDir', painel:'pvInspPhotoPainel', interior:'pvInspPhotoInterior', bancos:'pvInspPhotoBancos', estepe:'pvInspPhotoEstepe'};
+    const photos = {};
+    for(const [key, id] of Object.entries(photoSlotIds)){
+      const file = document.getElementById(id).files[0];
+      if(file) photos[key] = await processPhoto(file, subfolder);
+    }
+    const driveTextFileId = await uploadTextToDrive(
+      `VISTORIA — ${myVehicle.plate}\n\n` +
+      `Motorista: ${currentUser.name}\n` +
+      `KM: ${km}\n` +
+      `Resultado: ${RESULT_LABEL[result]}\n` +
+      `Data: ${fmtDate(Date.now())}\n\n` +
+      `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
+      `Observações:\n${observations || '—'}\n`,
+      `${new Date().toISOString().slice(0,10)}_vistoria.txt`, subfolder
+    );
+
+    const batch = writeBatch(db);
+    batch.set(doc(collection(db,'inspections')), {
+      vehicleId: myVehicle.id, vehiclePlate: myVehicle.plate, driverId: currentUser.driverId,
+      km, result, checklist, photos, extraPhotos:[], observations, driveTextFileId,
+      swapRequestId: null,
+      createdBy: currentUser.name, createdAt: Date.now(), generatedTickets:[],
+    });
+    batch.update(doc(db,'vehicles',myVehicle.id), {pendingInspection: false});
+    await batch.commit();
+
+    toast('Vistoria registrada.', 'ok');
+    closeModal('modalDriverInspection');
+  } catch(err){
+    toast('Erro ao salvar vistoria: '+err.message, 'err');
+  } finally {
+    setBtnLoading('btnSaveDriverInspection', false, null, 'pvInspUploadingBanner');
+  }
+});
+
 /* ============ TROCAS DE VEÍCULO — APROVAÇÃO (staff) ============ */
 function renderSwapRequests(){
   const statusFilter = document.getElementById('swapFilterStatus').value;
@@ -2018,8 +2139,11 @@ async function approveSwapRequest(s){
       status: s.reason==='Manutenção' ? 'em-manutencao' : (s.reason==='Sinistro' ? 'sinistrado' : 'reserva'),
       driverId: null,
     });
+    const toVehicle = vehicles.find(v=>v.id===s.toVehicleId);
+    const toDriverChanged = s.driverId && s.driverId !== (toVehicle?.driverId || null);
     batch.update(doc(db,'vehicles',s.toVehicleId), {
       status: 'em-uso', driverId: s.driverId,
+      ...(toDriverChanged ? {pendingInspection: true} : {}),
     });
     await batch.commit();
     toast('Troca aprovada e veículos atualizados.', 'ok');
