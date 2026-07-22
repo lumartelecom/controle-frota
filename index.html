@@ -2099,7 +2099,7 @@ document.getElementById('btnSaveDriverInspection').addEventListener('click', asy
       swapRequestId: null,
       createdBy: currentUser.name, createdAt: Date.now(), generatedTickets:[],
     });
-    batch.update(doc(db,'vehicles',myVehicle.id), {pendingInspection: false});
+    batch.update(doc(db,'vehicles',myVehicle.id), {pendingInspection: false, km});
     await batch.commit();
 
     toast('Vistoria registrada.', 'ok');
