@@ -3105,7 +3105,13 @@ async function deleteInspection(id){
   try {
     await deleteDoc(doc(db,'inspections',id));
     deleteDriveFiles([...Object.values(i.photos||{}), ...(i.extraPhotos||[]), i.driveTextFileId]);
-    toast('Vistoria excluída.', 'ok');
+    // Vistoria excluída (feita errado) não vale mais — volta o aviso de "vistoria
+    // pendente" pro motorista refazer, exceto quando é uma vistoria de troca de
+    // veículo (essas seguem o fluxo próprio de aprovação, não esse aviso).
+    if(!i.swapRequestId && i.vehicleId){
+      await updateDoc(doc(db,'vehicles',i.vehicleId), {pendingInspection: true});
+    }
+    toast('Vistoria excluída.' + (!i.swapRequestId && i.vehicleId ? ' O motorista vai ver o aviso de vistoria pendente de novo.' : ''), 'ok');
   } catch(err){
     toast('Erro ao excluir vistoria: '+err.message, 'err');
   }
