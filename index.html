@@ -1501,6 +1501,15 @@ function vehicleDisplayPhoto(v, inspList){
   return driveViewableUrl(v.photoURL) || null;
 }
 
+// KM a exibir: o maior valor entre o campo do veículo e o informado em qualquer
+// vistoria já registrada. Cobre vistorias feitas antes do KM passar a atualizar
+// o veículo automaticamente — sem isso, ficava mostrando "—" mesmo já tendo vistoria.
+function vehicleDisplayKm(v, inspList){
+  const kms = [Number(v?.km)||0, ...(inspList||[]).map(i=>Number(i.km)||0)];
+  const max = Math.max(...kms);
+  return max > 0 ? max : null;
+}
+
 // Monta a moldura padrão (proporção fixa, cantos arredondados, borda) usada em toda
 // tela que mostra a foto do veículo — com placeholder elegante quando não há foto.
 function vehiclePhotoFrameHtml(photoUrl){
@@ -1779,7 +1788,7 @@ function renderMeuCarro(){
           <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
         </div>
         <div style="font-size:15px; font-weight:600; margin-bottom:4px;">${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</div>
-        <div style="font-size:13px; color:var(--ink-muted);">KM atual: ${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
+        <div style="font-size:13px; color:var(--ink-muted);">KM atual: ${(()=>{const k=vehicleDisplayKm(v, myInspections); return k ? Number(k).toLocaleString('pt-BR') : '—';})()}</div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:16px;">
           <button type="button" class="btn btn-primary btn-sm" id="btnMeuCarroAbrirOS">Abrir Manutenção</button>
           <button type="button" class="btn btn-primary btn-sm" id="btnSolicitarTroca">🔄 ${activeSwap ? 'Acompanhar solicitação de troca' : 'Solicitar troca de veículo'}</button>
@@ -1839,7 +1848,7 @@ function renderMeuVeiculo(){
           <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Marca</div>${escapeHtml(v.brand||'—')}</div>
           <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Modelo</div>${escapeHtml(v.model||'—')}</div>
           <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Ano</div>${v.year||'—'}</div>
-          <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
+          <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${(()=>{const k=vehicleDisplayKm(v, myInspections); return k ? Number(k).toLocaleString('pt-BR') : '—';})()}</div>
           <div class="full" style="grid-column:1/-1;"><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Centro de custo</div>${escapeHtml(v.costCenter||'—')}</div>
         </div>
       </div>
@@ -2480,7 +2489,7 @@ function renderVehicles(){
       <td><span class="plate">${escapeHtml(v.plate)}</span></td>
       <td>${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</td>
       <td>${FLEET_LABEL[v.fleet] || '—'}${v.fleetNumber ? ` · Nº ${escapeHtml(v.fleetNumber)}` : ''}</td>
-      <td class="mono">${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</td>
+      <td class="mono">${(()=>{const k=vehicleDisplayKm(v, inspections.filter(i=>i.vehicleId===v.id)); return k ? Number(k).toLocaleString('pt-BR') : '—';})()}</td>
       <td><span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span> ${vehicleAlertBadgesHtml(v)}</td>
       <td>${escapeHtml(driverName(v.driverId))}</td>
       ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteVehicle('${v.id}')">Excluir</button></td>` : ''}
@@ -2570,7 +2579,7 @@ function openVehicleDetail(id){
   `;
   document.getElementById('vdInfoGrid').innerHTML = `
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Ano</div>${v.year || '—'}</div>
-    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${v.km ? Number(v.km).toLocaleString('pt-BR') : '—'}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${(()=>{const k=vehicleDisplayKm(v, vehicleInspections); return k ? Number(k).toLocaleString('pt-BR') : '—';})()}</div>
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Motorista</div>${v.driverId ? `<span class="row-click" style="cursor:pointer; text-decoration:underline;" onclick="closeModal('modalVehicleDetail'); openDriverDetail('${v.driverId}')">${escapeHtml(driverName(v.driverId))}</span>` : '—'}</div>
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Centro de custo</div>${escapeHtml(v.costCenter||'—')}</div>
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Validade do CRLV</div>${v.crlvValidity ? new Date(v.crlvValidity+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div>
