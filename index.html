@@ -1423,6 +1423,12 @@ function vehicleAlerts(v){
 function vehicleAlertBadgesHtml(v){
   return vehicleAlerts(v).map(a=>`<span class="badge badge-${a.level==='danger'?'sinistrado':'alerta'}">${escapeHtml(a.label)}</span>`).join('');
 }
+// Precisa de vistoria se a flag estiver marcada OU se o veículo já está no nome de um
+// motorista mas nunca teve nenhuma vistoria registrada (cobre veículos que já vieram
+// com motorista atribuído antes desse controle existir, ou cadastros feitos direto no banco).
+function vehicleNeedsInspection(v, vehicleInspections){
+  return !!(v.pendingInspection || (v.driverId && (!vehicleInspections || vehicleInspections.length===0)));
+}
 function populateDriverSelects(){
   const optionalOptions = '<option value="">— Nenhum —</option>' + drivers.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
   const requiredOptions = '<option value="">Selecione…</option>' + drivers.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
@@ -1761,7 +1767,7 @@ function renderMeuCarro(){
   const activeSwap = getActiveSwapRequest();
   wrap.innerHTML = `
     <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
-    ${v.pendingInspection ? `<div class="alert-banner-danger">
+    ${vehicleNeedsInspection(v, myInspections) ? `<div class="alert-banner-danger">
       <span>⚠️ Seu veículo precisa passar por uma vistoria.</span>
       <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" id="btnFazerVistoriaPendente">Fazer vistoria</button>
     </div>` : ''}
@@ -1817,7 +1823,7 @@ function renderMeuVeiculo(){
   const photo = vehicleDisplayPhoto(v, myInspections);
   const allTix = [...myTickets].sort((a,b)=>b.createdAt-a.createdAt);
   wrap.innerHTML = `
-    ${v.pendingInspection ? `<div class="alert-banner-danger">
+    ${vehicleNeedsInspection(v, myInspections) ? `<div class="alert-banner-danger">
       <span>⚠️ Seu veículo precisa passar por uma vistoria.</span>
       <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" id="btnFazerVistoriaPendenteMV">Fazer vistoria</button>
     </div>` : ''}
