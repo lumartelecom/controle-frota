@@ -1,0 +1,144 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function myRole() {
+      return get(/databases/$(database)/documents/roles/$(request.auth.uid)).data;
+    }
+    function isStaff() {
+      return signedIn() && myRole().role in ['admin', 'supervisor', 'mecanico'];
+    }
+    function isAdmin() {
+      return signedIn() && myRole().role == 'admin';
+    }
+    function isApprover() {
+      return signedIn() && myRole().role in ['admin', 'supervisor'];
+    }
+    function myDriverId() {
+      return myRole().driverId;
+    }
+    function isMyVehicle(vehicleId) {
+      return signedIn() &&
+        get(/databases/$(database)/documents/vehicles/$(vehicleId)).data.driverId == myDriverId();
+    }
+    function mySwapRequest(swapRequestId) {
+      return get(/databases/$(database)/documents/swapRequests/$(swapRequestId)).data;
+    }
+    function ownsSwapRequest(swapRequestId) {
+      return signedIn() && mySwapRequest(swapRequestId).driverId == myDriverId();
+    }
+
+    // Perfil de acesso de cada login (uid do Firebase Auth -> nome/role/driverId)
+    match /roles/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isStaff());
+      allow create, delete: if isAdmin();
+      // Admin pode alterar tudo; o próprio usuário só pode marcar que trocou a senha
+      // (não pode mudar seu próprio role/driverId/name por essa via).
+      allow update: if isAdmin() ||
+        (signedIn() && request.auth.uid == uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['passwordChanged','passwordChangedAt','email']));
+    }
+
+    // Veículos: staff vê tudo; motorista enxerga o veículo vinculado a ele e também
+    // os veículos disponíveis (precisa pra escolher o "veículo solicitado" na troca).
+    // Excluir é só admin — supervisor/mecânico podem criar e editar. Motorista só
+    // pode mexer no próprio veículo pra marcar que a vistoria pendente foi feita e
+    // atualizar o KM (registrado na vistoria que ele mesmo faz).
+    match /vehicles/{vehicleId} {
+      allow read: if isStaff() || (signedIn() && resource.data.driverId == myDriverId()) ||
+        (signedIn() && resource.data.status == 'disponivel');
+      allow create: if isStaff();
+      allow update: if isStaff() ||
+        (signedIn() && resource.data.driverId == myDriverId() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingInspection','km']));
+      allow delete: if isAdmin();
+    }
+
+    // Motoristas: só staff acessa a lista/cadastro; excluir é só admin.
+    match /drivers/{driverId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // Contador de numeração de O.S. (documento counters/tickets, campo seq).
+    // Qualquer usuário logado pode ler e incrementar (staff e motorista abrem O.S.),
+    // mas o valor só pode SUBIR, nunca descer — isso impede que alguém "zere" o
+    // contador e cause números repetidos. Só admin pode apagar.
+    match /counters/{counterId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.seq is int && request.resource.data.seq >= 0;
+      allow update: if signedIn() && request.resource.data.seq is int &&
+        request.resource.data.seq > resource.data.seq;
+      allow delete: if isAdmin();
+    }
+
+    // Ordens de serviço: staff vê tudo; motorista só as do próprio veículo,
+    // e só pode abrir (create) O.S. para o próprio veículo. Excluir é só admin.
+    match /tickets/{ticketId} {
+      allow read: if isStaff() || isMyVehicle(resource.data.vehicleId);
+      allow create: if isStaff() ||
+        (isMyVehicle(request.resource.data.vehicleId) && request.resource.data.status == 'NOVO');
+      allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // Vistorias: staff vê tudo; motorista enxerga as do próprio veículo (foto mais
+    // recente na tela dele) e as vinculadas a uma solicitação de troca dele mesmo
+    // (inclusive do veículo que ainda não é dele — o que ele está pedindo).
+    // Criar: staff sempre pode; motorista pode criar vistoria presa a uma solicitação
+    // de troca que seja dele, ou uma vistoria avulsa do próprio veículo atual
+    // (ex.: resolver o aviso de "vistoria pendente"). Editar/excluir continuam staff/admin.
+    match /inspections/{inspectionId} {
+      allow read: if isStaff() || isMyVehicle(resource.data.vehicleId) ||
+        (signedIn() && resource.data.swapRequestId != null && ownsSwapRequest(resource.data.swapRequestId));
+      allow create: if isStaff() ||
+        (signedIn() && request.resource.data.swapRequestId != null && ownsSwapRequest(request.resource.data.swapRequestId)) ||
+        (signedIn() && request.resource.data.swapRequestId == null &&
+         request.resource.data.driverId == myDriverId() && isMyVehicle(request.resource.data.vehicleId));
+      allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+    match /vehicleSwaps/{swapId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // Histórico de vínculo motorista<->veículo por período (início/fim de cada
+    // atribuição). Só staff mexe — é gerado automaticamente pelo sistema toda vez
+    // que o motorista de um veículo muda.
+    match /driverAssignments/{assignmentId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // Solicitações de troca de veículo feitas pelo motorista (com vistorias
+    // obrigatórias). Motorista cria a própria solicitação e só pode avançá-la
+    // até "aguardando aprovação" (anexando as vistorias). Decidir (aprovar/
+    // reprovar/pedir ajuste) é só admin/supervisor — mecânico só enxerga o
+    // histórico e pode marcar que o aviso de WhatsApp já foi enviado.
+    // Excluir é só admin.
+    match /swapRequests/{requestId} {
+      allow read: if isStaff() || (signedIn() && resource.data.driverId == myDriverId());
+      allow create: if signedIn() && request.resource.data.driverId == myDriverId() &&
+        request.resource.data.status == 'VISTORIA_PENDENTE';
+      allow update: if isApprover() ||
+        (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notifiedApproval'])) ||
+        (signedIn() && resource.data.driverId == myDriverId() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['returnInspectionId','receiveInspectionId','status']) &&
+         request.resource.data.status in ['VISTORIA_PENDENTE','AGUARDANDO_APROVACAO']);
+      allow delete: if isAdmin();
+    }
+
+    // Configurações gerais (ex.: destinatários e chaves do WhatsApp). Só staff —
+    // nunca liberar leitura pra motorista aqui, pois guarda as API keys do CallMeBot.
+    match /settings/{docId} {
+      allow read, write: if isStaff();
+    }
+  }
+}
