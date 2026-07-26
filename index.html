@@ -2537,40 +2537,130 @@ function renderCharts(){
 // Exportação da frota inteira em planilha (CSV — abre direto no Excel). Uma linha por
 // veículo, ordenado por frota, com os dados pedidos: frota, veículo, cor, placa,
 // motorista e KM atual (já considerando o KM de vistorias, igual à tela de detalhe).
-function csvEscape(val){
-  const s = String(val==null ? '' : val);
-  return /[;"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+// Carrega a biblioteca de Excel (xlsx-js-style) só quando o usuário exporta — não pesa
+// no carregamento normal do sistema. Fica em cache depois da primeira vez.
+function ensureXLSX(){
+  return new Promise((resolve, reject)=>{
+    if(typeof XLSX!=='undefined') return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    s.onload = ()=>resolve();
+    s.onerror = ()=>reject(new Error('Não foi possível carregar a biblioteca de Excel. Verifique a internet.'));
+    document.head.appendChild(s);
+  });
 }
-function exportFleetToExcel(){
-  const header = ['Frota','Veículo','Cor','Placa','Motorista','KM atual'];
-  const sortedVehicles = [...vehicles].sort((a,b)=>{
-    const fa = FLEET_KEYS.indexOf(a.fleet), fb = FLEET_KEYS.indexOf(b.fleet);
-    if(fa!==fb) return fa-fb;
-    return (a.plate||'').localeCompare(b.plate||'');
+
+// Monta o workbook: aba "Painel" (capa/dashboard) + uma aba por frota, com as cores da marca.
+function buildFleetWorkbook(XLSX){
+  const NAVY='0D1626', WHITE='FFFFFF', INK='2A2D35', LIGHT='B8C4DA',
+        MUTED='6B7280', CARD='EAF2FF', ALT='F6F9FF', BORDER='9AA6B8';
+  const border1 = { style:'thin', color:{rgb:BORDER} };
+  const allB = { top:border1, bottom:border1, left:border1, right:border1 };
+  const S = {
+    title:   { font:{name:'Arial',sz:16,bold:true,color:{rgb:WHITE}}, fill:{patternType:'solid',fgColor:{rgb:NAVY}}, alignment:{horizontal:'left',vertical:'center'}, border:allB },
+    sub:     { font:{name:'Arial',sz:10,color:{rgb:MUTED}}, alignment:{vertical:'center'} },
+    kpiLbl:  { font:{name:'Arial',sz:9,bold:true,color:{rgb:LIGHT}}, fill:{patternType:'solid',fgColor:{rgb:NAVY}}, alignment:{horizontal:'center',vertical:'center'}, border:allB },
+    kpiVal:  { font:{name:'Arial',sz:24,bold:true,color:{rgb:WHITE}}, fill:{patternType:'solid',fgColor:{rgb:NAVY}}, alignment:{horizontal:'center',vertical:'center'}, border:allB },
+    sec:     { font:{name:'Arial',sz:12,bold:true,color:{rgb:NAVY}}, alignment:{vertical:'center'} },
+    th:      { font:{name:'Arial',sz:11,bold:true,color:{rgb:WHITE}}, fill:{patternType:'solid',fgColor:{rgb:NAVY}}, alignment:{horizontal:'left',vertical:'center'}, border:allB },
+    td:      { font:{name:'Arial',sz:10,color:{rgb:INK}}, alignment:{vertical:'center'}, border:allB },
+    tdAlt:   { font:{name:'Arial',sz:10,color:{rgb:INK}}, fill:{patternType:'solid',fgColor:{rgb:ALT}}, alignment:{vertical:'center'}, border:allB },
+    tdNum:   { font:{name:'Arial',sz:10,color:{rgb:INK}}, alignment:{horizontal:'right',vertical:'center'}, border:allB },
+    tdNumAlt:{ font:{name:'Arial',sz:10,color:{rgb:INK}}, fill:{patternType:'solid',fgColor:{rgb:ALT}}, alignment:{horizontal:'right',vertical:'center'}, border:allB },
+  };
+  const cell = (v, s) => ({ v: v==null?'':v, t: typeof v==='number'?'n':'s', s });
+  const kmOf = v => vehicleDisplayKm(v, inspections.filter(i=>i.vehicleId===v.id));
+
+  const groupKeys = [...FLEET_KEYS];
+  vehicles.forEach(v => { if(!groupKeys.includes(v.fleet)) groupKeys.push(v.fleet); });
+
+  const wb = XLSX.utils.book_new();
+
+  // ---- Capa / Painel ----
+  const fleetRows = groupKeys
+    .map(k => ({ label: FLEET_LABEL[k] || k || 'Sem frota', count: vehicles.filter(v=>v.fleet===k).length }))
+    .filter(r => r.count > 0);
+  const statusRows = ['disponivel','em-uso','em-manutencao','sinistrado','reserva']
+    .map(s => ({ label: VEHICLE_STATUS_LABEL[s] || s, count: vehicles.filter(v=>(v.status||'disponivel')===s).length }))
+    .filter(r => r.count > 0);
+  const osAbertas = tickets.filter(t => t.status!=='CONCLUIDO').length;
+
+  const P = [];
+  P.push([ cell('CONTROLE DE FROTA — LUMAR TELECOM', S.title), cell('',S.title), cell('',S.title), cell('',S.title), cell('',S.title) ]);
+  P.push([ cell('Painel da Frota · Exportado em '+fmtDate(Date.now()), S.sub) ]);
+  P.push([]);
+  P.push([ cell('VEÍCULOS', S.kpiLbl), cell('',S.kpiLbl), cell('MOTORISTAS', S.kpiLbl), cell('',S.kpiLbl), cell('O.S. ABERTAS', S.kpiLbl) ]);
+  P.push([ cell(vehicles.length, S.kpiVal), cell('',S.kpiVal), cell(drivers.length, S.kpiVal), cell('',S.kpiVal), cell(osAbertas, S.kpiVal) ]);
+  P.push([]);
+  P.push([ cell('Veículos por frota', S.sec) ]);
+  P.push([ cell('Frota', S.th), cell('Quantidade', S.th) ]);
+  fleetRows.forEach((r,i)=> P.push([ cell(r.label, i%2?S.tdAlt:S.td), cell(r.count, i%2?S.tdNumAlt:S.tdNum) ]));
+  P.push([]);
+  P.push([ cell('Veículos por status', S.sec) ]);
+  P.push([ cell('Status', S.th), cell('Quantidade', S.th) ]);
+  statusRows.forEach((r,i)=> P.push([ cell(r.label, i%2?S.tdAlt:S.td), cell(r.count, i%2?S.tdNumAlt:S.tdNum) ]));
+
+  const wsP = XLSX.utils.aoa_to_sheet(P);
+  wsP['!cols'] = [{wch:26},{wch:14},{wch:16},{wch:6},{wch:16}];
+  wsP['!merges'] = [
+    {s:{r:0,c:0}, e:{r:0,c:4}},
+    {s:{r:1,c:0}, e:{r:1,c:4}},
+    {s:{r:3,c:0}, e:{r:3,c:1}}, {s:{r:4,c:0}, e:{r:4,c:1}},
+    {s:{r:3,c:2}, e:{r:3,c:3}}, {s:{r:4,c:2}, e:{r:4,c:3}},
+  ];
+  wsP['!rows'] = [{hpt:26},{hpt:16},{hpt:6},{hpt:18},{hpt:34}];
+  XLSX.utils.book_append_sheet(wb, wsP, 'Painel');
+
+  // ---- Uma aba por frota ----
+  const usedNames = {};
+  const sheetName = (base) => {
+    let n = String(base).replace(/[\\/?*\[\]:]/g,'-').slice(0,28) || 'Frota';
+    let f = n, k = 2;
+    while(usedNames[f]) f = (n.slice(0,26)+' '+(k++));
+    usedNames[f] = 1; return f;
+  };
+  groupKeys.forEach(key => {
+    const group = vehicles.filter(v=>v.fleet===key).sort((a,b)=>(a.plate||'').localeCompare(b.plate||''));
+    if(!group.length) return;
+    const label = FLEET_LABEL[key] || key || 'Sem frota definida';
+    const A = [];
+    A.push([ cell(label+' — '+group.length+(group.length>1?' veículos':' veículo'), S.title), cell('',S.title), cell('',S.title), cell('',S.title), cell('',S.title) ]);
+    A.push([]);
+    A.push([ cell('Veículo', S.th), cell('Cor', S.th), cell('Placa', S.th), cell('Motorista', S.th), cell('KM atual', S.th) ]);
+    group.forEach((v,idx)=>{
+      const alt = idx%2===1;
+      const km = kmOf(v);
+      A.push([
+        cell(((v.brand?v.brand+' ':'')+(v.model||'')).trim() || '-', alt?S.tdAlt:S.td),
+        cell(v.color || '-', alt?S.tdAlt:S.td),
+        cell(v.plate || '-', alt?S.tdAlt:S.td),
+        cell(driverName(v.driverId), alt?S.tdAlt:S.td),
+        cell(km ? Number(km) : '-', alt?(km?S.tdNumAlt:S.tdAlt):(km?S.tdNum:S.td)),
+      ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(A);
+    ws['!cols'] = [{wch:26},{wch:14},{wch:12},{wch:22},{wch:12}];
+    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:4}}];
+    ws['!rows'] = [{hpt:24}];
+    XLSX.utils.book_append_sheet(wb, ws, sheetName(label));
   });
-  const rows = sortedVehicles.map(v=>{
-    const vehicleInspections = inspections.filter(i=>i.vehicleId===v.id);
-    const km = vehicleDisplayKm(v, vehicleInspections);
-    return [
-      FLEET_LABEL[v.fleet] || v.fleet || '—',
-      ((v.brand?v.brand+' ':'')+(v.model||'')).trim() || '—',
-      v.color || '—',
-      v.plate || '—',
-      driverName(v.driverId),
-      km ? Number(km).toLocaleString('pt-BR') : '—',
-    ];
-  });
-  const csvLines = [header, ...rows].map(cols=>cols.map(csvEscape).join(';'));
-  const csvContent = '\uFEFF' + csvLines.join('\r\n');
-  const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `frota_lumar_telecom_${new Date().toISOString().slice(0,10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+
+  return wb;
+}
+
+async function exportFleetToExcel(){
+  const btn = document.getElementById('btnExportFleetExcel');
+  const original = btn ? btn.textContent : '';
+  try {
+    if(btn){ btn.disabled = true; btn.textContent = 'Gerando…'; }
+    await ensureXLSX();
+    const wb = buildFleetWorkbook(XLSX);
+    XLSX.writeFile(wb, `frota_lumar_telecom_${new Date().toISOString().slice(0,10)}.xlsx`);
+  } catch(err){
+    toast(err.message || 'Erro ao gerar a planilha.', 'err');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = original; }
+  }
 }
 document.getElementById('btnExportFleetExcel').addEventListener('click', exportFleetToExcel);
 
@@ -3400,7 +3490,10 @@ document.getElementById('btnSaveTicket').addEventListener('click', async ()=>{
       `Descrição do serviço solicitado:\n${description}\n`,
       `${ticketNumber}_solicitacao.txt`, subfolder
     );
-    await addDoc(collection(db,'tickets'), {
+    // Se a O.S. é Crítica OU o veículo está parado, coloca o veículo em manutenção.
+    const shouldMaintenance = (priority==='CRITICA' || parado);
+    const ticketBatch = writeBatch(db);
+    ticketBatch.set(doc(collection(db,'tickets')), {
       ticketNumber, vehicleId, vehiclePlate: vehicle?.plate || '—',
       description, priority, status:'NOVO',
       km, location,
@@ -3408,7 +3501,11 @@ document.getElementById('btnSaveTicket').addEventListener('click', async ()=>{
       openedByUid: currentUser.uid, openedByName: currentUser.name,
       createdAt: Date.now(), updatedAt: Date.now()
     });
-    toast(`O.S. ${ticketNumber} aberta.`, 'ok');
+    if(shouldMaintenance && vehicle && vehicle.status!=='em-manutencao'){
+      ticketBatch.update(doc(db,'vehicles',vehicleId), { status:'em-manutencao' });
+    }
+    await ticketBatch.commit();
+    toast(`O.S. ${ticketNumber} aberta.` + (shouldMaintenance && vehicle && vehicle.status!=='em-manutencao' ? ' Veículo marcado como Em manutenção.' : ''), 'ok');
     closeModal('modalTicket');
   } catch(err){
     toast('Erro ao abrir O.S.: '+err.message, 'err');
@@ -3527,7 +3624,8 @@ document.getElementById('btnConfirmCloseTicket').addEventListener('click', async
       `Serviço executado:\n${closingDescription}\n`,
       `${t.ticketNumber}_fechamento.txt`, closeSubfolder
     );
-    await updateDoc(doc(db,'tickets',id), {
+    const closeBatch = writeBatch(db);
+    closeBatch.update(doc(db,'tickets',id), {
       status: 'CONCLUIDO',
       closingDescription,
       closingPhotos,
@@ -3536,7 +3634,16 @@ document.getElementById('btnConfirmCloseTicket').addEventListener('click', async
       closedAt: Date.now(),
       updatedAt: Date.now(),
     });
-    toast(`O.S. ${t.ticketNumber} fechada.`, 'ok');
+    // Se esta era a última O.S. aberta do veículo e ele está em manutenção, volta ao
+    // normal automaticamente (Em uso se tiver motorista, senão Disponível).
+    const outrasAbertas = tickets.some(x => x.vehicleId===t.vehicleId && x.id!==id && x.status!=='CONCLUIDO');
+    let voltouAoNormal = false;
+    if(!outrasAbertas && closeVehicle && closeVehicle.status==='em-manutencao'){
+      closeBatch.update(doc(db,'vehicles',t.vehicleId), { status: closeVehicle.driverId ? 'em-uso' : 'disponivel' });
+      voltouAoNormal = true;
+    }
+    await closeBatch.commit();
+    toast(`O.S. ${t.ticketNumber} fechada.` + (voltouAoNormal ? ' Veículo liberado da manutenção.' : ''), 'ok');
     closeModal('modalTicketClose');
     openTicketDetail(id);
   } catch(err){
