@@ -449,6 +449,8 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
         </div>
         <div class="kpi-grid" id="kpiGrid"></div>
 
+        <div id="dashInspectionAlert"></div>
+
         <div class="panel" style="margin-bottom:24px;">
           <div class="panel-head"><h3>Veículos por Frota</h3></div>
           <div class="fleet-overview" id="fleetOverview"></div>
@@ -2328,11 +2330,13 @@ async function approveSwapRequest(s){
       driverId: null,
     });
     updateDriverAssignment(batch, s.fromVehicleId, s.fromPlate, fromVehicle?.driverId||null, null);
-    const toVehicle = vehicles.find(v=>v.id===s.toVehicleId);
-    const toDriverChanged = s.driverId && s.driverId !== (toVehicle?.driverId || null);
+    // Na troca por solicitação, o motorista JÁ fez a vistoria de recebimento do
+    // carro novo (receiveInspectionId) durante o fluxo. Então o carro novo NÃO
+    // fica com vistoria pendente — se cair aqui sem a vistoria de recebimento
+    // (situação anômala), aí sim marca como pendente.
     batch.update(doc(db,'vehicles',s.toVehicleId), {
       status: 'em-uso', driverId: s.driverId,
-      ...(toDriverChanged ? {pendingInspection: true} : {}),
+      pendingInspection: s.receiveInspectionId ? false : true,
     });
     updateDriverAssignment(batch, s.toVehicleId, s.toPlate, toVehicle?.driverId||null, s.driverId);
     await batch.commit();
@@ -2461,6 +2465,24 @@ function renderDashboard(){
       <div class="val">${c.val}</div>
       <div class="lbl">${c.lbl}</div>
     </button>`).join('');
+
+  // Alerta pros staff: veículos sem vistoria em dia (vistoria pendente marcada,
+  // ou veículo já com motorista que nunca teve vistoria registrada).
+  const alertEl = document.getElementById('dashInspectionAlert');
+  if(alertEl){
+    const semVistoria = vehicles.filter(v=>vehicleNeedsInspection(v, inspections.filter(i=>i.vehicleId===v.id)));
+    if(semVistoria.length){
+      const plates = semVistoria
+        .map(v=>`${escapeHtml(v.plate||'—')}${v.driverId ? ' ('+escapeHtml(driverName(v.driverId))+')' : ''}`)
+        .join(', ');
+      alertEl.innerHTML = `<div class="alert-banner-danger" style="margin-bottom:24px;">
+        <span>⚠️ ${semVistoria.length} veículo(s) sem vistoria em dia: ${plates}.</span>
+        <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" onclick="switchView('vehicles', null)">Ver veículos</button>
+      </div>`;
+    } else {
+      alertEl.innerHTML = '';
+    }
+  }
 
   renderCharts();
 
