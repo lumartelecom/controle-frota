@@ -1410,6 +1410,12 @@ const VEHICLE_STATUS_LABEL = {
 const FLEET_LABEL = {LUMAR:'Frota Lumar', MOVIDA:'Frota Movida', AFONSO:'Frota Afonso'};
 const FLEET_KEYS = ['LUMAR','MOVIDA','AFONSO'];
 
+// Filtro especial da lista de veículos: mostra só os que estão com vistoria pendente.
+// Não é um status do veículo (por isso não entra no select de status) — vem do card
+// "Vistorias pendentes" do dashboard e aparece como uma etiqueta que dá pra remover.
+const VEHICLE_FILTER_INSPECTION = 'PENDENCIA_VISTORIA';
+let vehicleOnlyPendingInspection = false;
+
 function driverName(id){
   const d = drivers.find(x=>x.id===id);
   return d ? d.name : '—';
@@ -1707,9 +1713,9 @@ function attachStaffListeners(){
 
   unsubscribers.push(onSnapshot(collection(db,'inspections'), snap=>{
     inspections = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    // A lista de veículos e o quadro por frota mostram o KM e o ícone de vistoria,
-    // que saem daqui — por isso precisam ser redesenhados quando as vistorias mudam.
-    renderInspections(); renderVehicles(); renderFleetOverview();
+    // A lista de veículos, o quadro por frota e o card "Vistorias pendentes" mostram
+    // dados que saem daqui — por isso são redesenhados quando as vistorias mudam.
+    renderInspections(); renderVehicles(); renderFleetOverview(); renderDashboard();
   }, err=>toast('Erro lendo vistorias: '+err.message, 'err')));
 
   unsubscribers.push(onSnapshot(collection(db,'vehicleSwaps'), snap=>{
@@ -1822,7 +1828,9 @@ function switchView(view, filter){
   document.getElementById('viewTitle').textContent = titles[view];
 
   if(view==='vehicles'){
-    document.getElementById('vehicleFilterStatus').value = filter || '';
+    vehicleOnlyPendingInspection = (filter === VEHICLE_FILTER_INSPECTION);
+    // O filtro de vistoria não é um status, então limpa o select nesse caso.
+    document.getElementById('vehicleFilterStatus').value = vehicleOnlyPendingInspection ? '' : (filter || '');
     tablePageState.vehicles = 1;
     renderVehicles();
   }
@@ -2545,14 +2553,16 @@ function renderDashboard(){
   const disponiveis = vehicles.filter(v=>v.status==='disponivel').length;
   const abertos = tickets.filter(t=>t.status!=='CONCLUIDO').length;
   const concluidos = tickets.filter(t=>t.status==='CONCLUIDO').length;
-  const comAlerta = vehicles.filter(v=>vehicleAlerts(v).length>0).length;
+  // Conta os veículos com vistoria pendente. Clicar no card abre a lista de veículos
+  // já filtrada só nesses carros (antes o card só abria a lista inteira).
+  const semVistoria = vehicles.filter(v=>vehicleNeedsInspection(v, inspections.filter(i=>i.vehicleId===v.id))).length;
 
   const cards = [
     {val: totalV, lbl:'Veículos na frota', view:'vehicles', accent:'var(--brand)', icon:'🚐'},
     {val: disponiveis, lbl:'Disponíveis', view:'vehicles', filter:'disponivel', accent:'var(--st-concluido)', icon:'✅'},
     {val: abertos, lbl:'Chamados abertos', view:'tickets', accent:'var(--st-alta)', icon:'🛠'},
     {val: concluidos, lbl:'Concluídos', view:'tickets', filter:'CONCLUIDO', accent:'var(--st-concluido)', icon:'🏁'},
-    {val: comAlerta, lbl:'Veículos c/ pendências', view:'vehicles', accent:'#B8720A', icon:'⚠️'},
+    {val: semVistoria, lbl:'Vistorias pendentes', view:'vehicles', filter:VEHICLE_FILTER_INSPECTION, accent:'#B8720A', icon:'📋'},
   ];
   document.getElementById('kpiGrid').innerHTML = cards.map(c=>`
     <button type="button" class="kpi-card" style="--accent:${c.accent}" onclick="switchView('${c.view}', ${c.filter ? `'${c.filter}'` : 'null'})">
@@ -3068,7 +3078,9 @@ function renderVehicles(){
   const statusFilter = document.getElementById('vehicleFilterStatus').value;
   const fleetFilter = document.getElementById('vehicleFilterFleet').value;
   const isAdmin = currentUser.role === 'admin';
+  const pendente = v => vehicleNeedsInspection(v, inspections.filter(i=>i.vehicleId===v.id));
   let filtered = vehicles.filter(v =>
+    (!vehicleOnlyPendingInspection || pendente(v)) &&
     (!statusFilter || v.status===statusFilter) &&
     (!fleetFilter || v.fleet===fleetFilter) &&
     (!search ||
@@ -3083,8 +3095,15 @@ function renderVehicles(){
     fleet: v=>FLEET_LABEL[v.fleet]||'', km: v=>v.km||0,
     status: v=>VEHICLE_STATUS_LABEL[v.status]||'', driver: v=>driverName(v.driverId),
   });
-  document.getElementById('vehicleCountDesc').textContent = `${vehicles.length} veículo(s) cadastrado(s)`;
-  document.getElementById('vehiclesEmpty').classList.toggle('hidden', filtered.length>0);
+  document.getElementById('vehicleCountDesc').innerHTML = vehicleOnlyPendingInspection
+    ? `<span class="badge badge-sinistrado">📋 Vistoria pendente · ${filtered.length}</span>
+       <button type="button" class="btn btn-ghost btn-xs" style="margin-left:8px;" onclick="limparFiltroVistoria()">✕ Ver todos</button>`
+    : `${vehicles.length} veículo(s) cadastrado(s)`;
+  const emptyEl = document.getElementById('vehiclesEmpty');
+  emptyEl.classList.toggle('hidden', filtered.length>0);
+  emptyEl.innerHTML = vehicleOnlyPendingInspection
+    ? `<div class="ic">✅</div>Nenhum veículo com vistoria pendente — está tudo em dia!`
+    : `<div class="ic">🚐</div>Nenhum veículo cadastrado ainda.`;
   document.getElementById('vehiclesThead').innerHTML = `<tr>
     ${sortableTh('vehicles','plate','Placa')}${sortableTh('vehicles','model','Modelo')}${sortableTh('vehicles','fleet','Frota')}
     ${sortableTh('vehicles','km','KM')}${sortableTh('vehicles','status','Status')}${sortableTh('vehicles','driver','Motorista')}
@@ -3096,14 +3115,25 @@ function renderVehicles(){
       <td>${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</td>
       <td>${FLEET_LABEL[v.fleet] || '—'}${v.fleetNumber ? ` · Nº ${escapeHtml(v.fleetNumber)}` : ''}</td>
       <td class="mono">${(()=>{const k=vehicleDisplayKm(v, inspections.filter(i=>i.vehicleId===v.id)); return k ? Number(k).toLocaleString('pt-BR') : '—';})()}</td>
-      <td><span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span> ${vehicleAlertBadgesHtml(v)}</td>
+      <td><span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span> ${vehicleAlertBadgesHtml(v)}${
+        pendente(v) ? ' <span class="badge badge-sinistrado">📋 Vistoria pendente</span>' : ''}</td>
       <td>${escapeHtml(driverName(v.driverId))}</td>
       ${isAdmin ? `<td><button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation(); deleteVehicle('${v.id}')">Excluir</button></td>` : ''}
     </tr>`).join('');
   renderPaginationBar('vehicles', 'vehiclesPagination', filtered.length, renderVehicles);
 }
+// Tira o filtro de "vistoria pendente" e volta a mostrar a frota inteira.
+function limparFiltroVistoria(){
+  vehicleOnlyPendingInspection = false;
+  tablePageState.vehicles = 1;
+  renderVehicles();
+}
+window.limparFiltroVistoria = limparFiltroVistoria;
+
 document.getElementById('vehicleSearch').addEventListener('input', ()=>{ tablePageState.vehicles=1; renderVehicles(); });
-document.getElementById('vehicleFilterStatus').addEventListener('change', ()=>{ tablePageState.vehicles=1; renderVehicles(); });
+// Escolher um status pela mão desliga o filtro de vistoria — senão os dois se somariam
+// e a lista podia ficar vazia sem explicação.
+document.getElementById('vehicleFilterStatus').addEventListener('change', ()=>{ vehicleOnlyPendingInspection=false; tablePageState.vehicles=1; renderVehicles(); });
 document.getElementById('vehicleFilterFleet').addEventListener('change', ()=>{ tablePageState.vehicles=1; renderVehicles(); });
 
 /* ============ FROTAS (visão separada, agrupada) ============ */
