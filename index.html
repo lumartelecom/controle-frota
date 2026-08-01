@@ -445,11 +445,12 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <h2>Visão geral da frota</h2>
             <div class="desc">Panorama em tempo real dos veículos e ordens de serviço</div>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm" id="btnExportFleetExcel">📊 Exportar frota (Excel)</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-ghost btn-sm" id="btnExportFleetExcel">📊 Exportar frota (Excel)</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="btnExportMgmtExcel">📈 Relatório gerencial (Excel)</button>
+          </div>
         </div>
         <div class="kpi-grid" id="kpiGrid"></div>
-
-        <div id="dashInspectionAlert"></div>
 
         <div class="panel" style="margin-bottom:24px;">
           <div class="panel-head"><h3>Veículos por Frota</h3></div>
@@ -1036,6 +1037,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
         <div class="field"><label>Condutor responsável *</label><select id="inspDriverId" required><option value="">Selecione…</option></select></div>
         <div class="field"><label>Data/hora</label><input id="inspDate" type="datetime-local"></div>
         <div class="field"><label>KM atual *</label><input id="inspKm" type="number" min="0" required></div>
+        <div class="field"><label>KM da última troca de óleo *</label><input id="inspOilKm" type="number" min="0" required placeholder="veja o adesivo no vidro"></div>
 
         <div class="field full">
           <label>Checklist de itens</label>
@@ -1058,6 +1060,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <div class="photo-slot"><label>Painel completo</label><input type="file" id="inspPhotoPainelCompleto" accept="image/*"></div>
             <div class="photo-slot"><label>Difusores de ar-condicionado</label><input type="file" id="inspPhotoDifusoresAr" accept="image/*"></div>
             <div class="photo-slot"><label>Pneus</label><input type="file" id="inspPhotoPneus" accept="image/*"></div>
+            <div class="photo-slot"><label>Adesivo da troca de óleo</label><input type="file" id="inspPhotoAdesivoOleo" accept="image/*"></div>
           </div>
         </div>
         <div class="field full"><label>Fotos adicionais / avarias (opcional, várias)</label><input type="file" id="inspExtraPhotos" accept="image/*" multiple></div>
@@ -1149,6 +1152,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
     <div class="modal-body">
       <div class="form-grid">
         <div class="field"><label>KM atual *</label><input id="swInspKm" type="number" min="0" required></div>
+        <div class="field"><label>KM da última troca de óleo *</label><input id="swInspOilKm" type="number" min="0" required placeholder="veja o adesivo no vidro"></div>
 
         <div class="field full">
           <label>Checklist de itens</label>
@@ -1171,6 +1175,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <div class="photo-slot"><label>Painel completo</label><input type="file" id="swInspPhotoPainelCompleto" accept="image/*"></div>
             <div class="photo-slot"><label>Difusores de ar-condicionado</label><input type="file" id="swInspPhotoDifusoresAr" accept="image/*"></div>
             <div class="photo-slot"><label>Pneus</label><input type="file" id="swInspPhotoPneus" accept="image/*"></div>
+            <div class="photo-slot"><label>Adesivo da troca de óleo</label><input type="file" id="swInspPhotoAdesivoOleo" accept="image/*"></div>
           </div>
         </div>
 
@@ -1196,6 +1201,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
     <div class="modal-body">
       <div class="form-grid">
         <div class="field"><label>KM atual *</label><input id="pvInspKm" type="number" min="0" required></div>
+        <div class="field"><label>KM da última troca de óleo *</label><input id="pvInspOilKm" type="number" min="0" required placeholder="veja o adesivo no vidro"></div>
 
         <div class="field full">
           <label>Checklist de itens</label>
@@ -1218,6 +1224,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <div class="photo-slot"><label>Painel completo</label><input type="file" id="pvInspPhotoPainelCompleto" accept="image/*"></div>
             <div class="photo-slot"><label>Difusores de ar-condicionado</label><input type="file" id="pvInspPhotoDifusoresAr" accept="image/*"></div>
             <div class="photo-slot"><label>Pneus</label><input type="file" id="pvInspPhotoPneus" accept="image/*"></div>
+            <div class="photo-slot"><label>Adesivo da troca de óleo</label><input type="file" id="pvInspPhotoAdesivoOleo" accept="image/*"></div>
           </div>
         </div>
 
@@ -1438,24 +1445,37 @@ function isCnhExpired(d){
 // 'danger' = já vencido/atrasado; 'alerta' = vencendo/se aproximando (1.000km).
 // CRLV no Brasil é licenciado por ano (não por dia exato), então o controle é
 // só o ano do documento atual: se for menor que o ano corrente, está vencido.
-function vehicleAlerts(v){
+// Usa o MESMO KM que o resto do sistema mostra (maior entre o cadastro do veículo e o
+// informado nas vistorias). Antes olhava só v.km, então um veículo cujo KM só subiu via
+// vistoria não disparava "Revisão atrasada" — o alerta ficava atrasado em relação à tela.
+function vehicleAlerts(v, inspList){
   const alerts = [];
   const currentYear = new Date().getFullYear();
   if(v.crlvYear && v.crlvYear < currentYear) alerts.push({label:'CRLV vencido', level:'danger'});
-  if(v.nextMaintenanceKm && v.km){
-    if(v.km >= v.nextMaintenanceKm) alerts.push({label:'Revisão atrasada', level:'danger'});
-    else if(v.km >= v.nextMaintenanceKm - 1000) alerts.push({label:'Revisão próxima', level:'alerta'});
+  const km = vehicleDisplayKm(v, inspList || inspections.filter(i=>i.vehicleId===v.id));
+  if(v.nextMaintenanceKm && km){
+    if(km >= v.nextMaintenanceKm) alerts.push({label:'Revisão atrasada', level:'danger'});
+    else if(km >= v.nextMaintenanceKm - 1000) alerts.push({label:'Revisão próxima', level:'alerta'});
   }
   return alerts;
 }
 function vehicleAlertBadgesHtml(v){
   return vehicleAlerts(v).map(a=>`<span class="badge badge-${a.level==='danger'?'sinistrado':'alerta'}">${escapeHtml(a.label)}</span>`).join('');
 }
-// Precisa de vistoria se a flag estiver marcada OU se o veículo já está no nome de um
-// motorista mas nunca teve nenhuma vistoria registrada (cobre veículos que já vieram
-// com motorista atribuído antes desse controle existir, ou cadastros feitos direto no banco).
+// A situação da vistoria é DEDUZIDA dos dados, não lida de uma flag salva no banco.
+// Antes usava o campo pendingInspection, que ficava preso em "true" e mostrava o carro
+// como pendente mesmo depois da vistoria feita (a vistoria de troca não limpava a flag,
+// e o carro devolvido continuava marcado mesmo sem motorista).
+//
+// Regra: só precisa de vistoria o veículo que ESTÁ com um motorista e cujo motorista
+// ATUAL ainda não fez nenhuma vistoria nele. Assim:
+//  • fez a vistoria (comum ou de troca) → some sozinho;
+//  • trocou de motorista → volta a pedir, porque o novo condutor ainda não vistoriou;
+//  • admin excluiu a vistoria errada → volta a pedir, porque o registro sumiu da lista;
+//  • carro sem motorista (manutenção, reserva) → não cobra vistoria de ninguém.
 function vehicleNeedsInspection(v, vehicleInspections){
-  return !!(v.pendingInspection || (v.driverId && (!vehicleInspections || vehicleInspections.length===0)));
+  if(!v || !v.driverId) return false;
+  return !(vehicleInspections || []).some(i => i.driverId === v.driverId);
 }
 function populateDriverSelects(){
   const optionalOptions = '<option value="">— Nenhum —</option>' + drivers.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('');
@@ -1480,7 +1500,26 @@ const CHECKLIST_ITEMS = [
 ];
 const RESULT_LABEL = {APROVADO:'Aprovado', RESSALVAS:'Aprovado c/ ressalvas', REPROVADO:'Reprovado'};
 const CHECKLIST_STATUS_LABEL = {ok:'OK', problema:'Problema', na:'N/A'};
-const PHOTO_SLOT_LABEL = {frente:'Frente', traseira:'Traseira', lateralEsq:'Lateral esquerda', lateralDir:'Lateral direita', painel:'Painel / KM', interior:'Interior', bancos:'Bancos', estepe:'Estepe', portaMalas:'Porta-malas', motor:'Motor', painelCompleto:'Painel completo', difusoresAr:'Difusores de ar-condicionado', pneus:'Pneus'};
+const PHOTO_SLOT_LABEL = {frente:'Frente', traseira:'Traseira', lateralEsq:'Lateral esquerda', lateralDir:'Lateral direita', painel:'Painel / KM', interior:'Interior', bancos:'Bancos', estepe:'Estepe', portaMalas:'Porta-malas', motor:'Motor', painelCompleto:'Painel completo', difusoresAr:'Difusores de ar-condicionado', pneus:'Pneus', adesivoOleo:'Adesivo da troca de óleo'};
+
+// Intervalo padrão entre trocas de óleo. A partir do KM da última troca (lido do adesivo
+// no vidro durante a vistoria), o sistema calcula sozinho quando é a próxima revisão.
+// Para mudar o intervalo da frota inteira, basta alterar este número.
+const OIL_CHANGE_INTERVAL_KM = 10000;
+// Lê o KM da última troca de óleo informado na vistoria e devolve os campos que o
+// veículo deve receber: guarda a troca e já calcula sozinho a próxima revisão
+// (KM da troca + intervalo padrão). É assim que a vistoria "alimenta" o alerta de
+// revisão que aparece na lista de veículos e no dashboard.
+function oilChangeVehicleFields(oilKm){
+  const km = Number(oilKm);
+  if(!km || km <= 0) return {};
+  return {
+    lastOilChangeKm: km,
+    lastOilChangeAt: Date.now(),
+    nextMaintenanceKm: km + OIL_CHANGE_INTERVAL_KM,
+  };
+}
+
 function validatePhotoSlotsFilled(photoSlotIds){
   const missing = [];
   for(const [key, id] of Object.entries(photoSlotIds)){
@@ -1668,7 +1707,9 @@ function attachStaffListeners(){
 
   unsubscribers.push(onSnapshot(collection(db,'inspections'), snap=>{
     inspections = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    renderInspections();
+    // A lista de veículos e o quadro por frota mostram o KM e o ícone de vistoria,
+    // que saem daqui — por isso precisam ser redesenhados quando as vistorias mudam.
+    renderInspections(); renderVehicles(); renderFleetOverview();
   }, err=>toast('Erro lendo vistorias: '+err.message, 'err')));
 
   unsubscribers.push(onSnapshot(collection(db,'vehicleSwaps'), snap=>{
@@ -1715,30 +1756,50 @@ function attachMotoristaListeners(){
   }, err=>toast('Erro lendo veículos disponíveis: '+err.message, 'err'));
   unsubscribers.push(unsubAv);
 
+  // As O.S. e vistorias dependem de QUAL veículo é o do motorista, então esses dois
+  // listeners ficam pendurados no listener do veículo. Como o doc do veículo muda com
+  // frequência (KM, status, vistoria pendente), o callback abaixo roda várias vezes —
+  // por isso os listeners internos são cancelados e recriados a cada vez, senão iriam
+  // se acumulando (leituras duplicadas no Firestore e re-render repetido).
+  let vehicleChildUnsubs = [];
+  const clearVehicleChildListeners = ()=>{
+    vehicleChildUnsubs.forEach(fn=>fn());
+    vehicleChildUnsubs = [];
+  };
+  let lastVehicleId = null;
+
   const vq = query(collection(db,'vehicles'), where('driverId','==', currentUser.driverId));
   const unsubV = onSnapshot(vq, snap=>{
     myVehicle = snap.empty ? null : {id:snap.docs[0].id, ...snap.docs[0].data()};
     renderMeuCarro(); renderMeuVeiculo();
     if(myVehicle){
-      const tq = query(collection(db,'tickets'), where('vehicleId','==', myVehicle.id));
-      const unsubT = onSnapshot(tq, tsnap=>{
+      // Só reassina se realmente trocou de veículo — atualização do mesmo doc não precisa.
+      if(myVehicle.id === lastVehicleId) return;
+      clearVehicleChildListeners();
+      lastVehicleId = myVehicle.id;
+      const vehicleId = myVehicle.id;
+
+      const tq = query(collection(db,'tickets'), where('vehicleId','==', vehicleId));
+      vehicleChildUnsubs.push(onSnapshot(tq, tsnap=>{
         myTickets = tsnap.docs.map(d=>({id:d.id, ...d.data()}));
         renderMeuCarro(); renderMeuVeiculo(); renderMinhasOS();
-      }, err=>toast('Erro lendo suas O.S.: '+err.message, 'err'));
-      unsubscribers.push(unsubT);
+      }, err=>toast('Erro lendo suas O.S.: '+err.message, 'err')));
 
-      const iq = query(collection(db,'inspections'), where('vehicleId','==', myVehicle.id));
-      const unsubI = onSnapshot(iq, isnap=>{
+      const iq = query(collection(db,'inspections'), where('vehicleId','==', vehicleId));
+      vehicleChildUnsubs.push(onSnapshot(iq, isnap=>{
         myInspections = isnap.docs.map(d=>({id:d.id, ...d.data()}));
         renderMeuCarro(); renderMeuVeiculo();
-      }, err=>toast('Erro lendo vistorias do veículo: '+err.message, 'err'));
-      unsubscribers.push(unsubI);
+      }, err=>toast('Erro lendo vistorias do veículo: '+err.message, 'err')));
     } else {
+      clearVehicleChildListeners();
+      lastVehicleId = null;
       myTickets = []; myInspections = [];
       renderMeuCarro(); renderMeuVeiculo(); renderMinhasOS();
     }
   }, err=>toast('Erro lendo seu veículo: '+err.message, 'err'));
   unsubscribers.push(unsubV);
+  // No logout, o onAuthStateChanged roda os unsubscribers — leva os filhos junto.
+  unsubscribers.push(clearVehicleChildListeners);
 }
 
 /* ============ NAVIGATION ============ */
@@ -1886,6 +1947,16 @@ function renderMeuVeiculo(){
           <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Cor</div>${escapeHtml(v.color||'—')}</div>
           <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Ano</div>${v.year||'—'}</div>
           <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${(()=>{const k=vehicleDisplayKm(v, myInspections); return k ? Number(k).toLocaleString('pt-BR') : '—';})()}</div>
+          <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Última troca de óleo</div>${v.lastOilChangeKm ? Number(v.lastOilChangeKm).toLocaleString('pt-BR')+' km' : '—'}</div>
+          <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Próxima revisão</div>${(()=>{
+            if(!v.nextMaintenanceKm) return '—';
+            const alvo = Number(v.nextMaintenanceKm);
+            const atual = vehicleDisplayKm(v, myInspections) || 0;
+            const falta = alvo - atual;
+            const cor = falta <= 0 ? 'var(--st-critica)' : (falta <= 1000 ? 'var(--st-alta)' : 'var(--ink)');
+            const nota = falta <= 0 ? `vencida há ${Math.abs(falta).toLocaleString('pt-BR')} km` : `faltam ${falta.toLocaleString('pt-BR')} km`;
+            return `<span style="color:${cor}; font-weight:600;">${alvo.toLocaleString('pt-BR')} km</span><div style="font-size:11px; color:${cor};">${nota}</div>`;
+          })()}</div>
         </div>
       </div>
     </div>
@@ -2008,6 +2079,7 @@ function openSwapInspectionModal(s, leg){
   currentSwapLeg = { swapRequestId: s.id, leg, vehicleId, plate };
   document.getElementById('swInspTitle').textContent = `Vistoria — veículo ${leg==='devolucao'?'devolvido':'recebido'}: ${plate}`;
   document.getElementById('swInspKm').value = '';
+  document.getElementById('swInspOilKm').value = '';
   document.getElementById('swInspObservations').value = '';
   CHECKLIST_ITEMS.forEach(item=>{
     document.getElementById('swchk_'+item.key).value = 'ok';
@@ -2015,7 +2087,7 @@ function openSwapInspectionModal(s, leg){
     obs.value = '';
     obs.classList.add('hidden');
   });
-  ['swInspPhotoFrente','swInspPhotoTraseira','swInspPhotoLatEsq','swInspPhotoLatDir','swInspPhotoPainel','swInspPhotoInterior','swInspPhotoBancos','swInspPhotoEstepe','swInspPhotoPortaMalas','swInspPhotoMotor','swInspPhotoPainelCompleto','swInspPhotoDifusoresAr','swInspPhotoPneus'].forEach(id=>{
+  ['swInspPhotoFrente','swInspPhotoTraseira','swInspPhotoLatEsq','swInspPhotoLatDir','swInspPhotoPainel','swInspPhotoInterior','swInspPhotoBancos','swInspPhotoEstepe','swInspPhotoPortaMalas','swInspPhotoMotor','swInspPhotoPainelCompleto','swInspPhotoDifusoresAr','swInspPhotoPneus','swInspPhotoAdesivoOleo'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   openModal('modalSwapInspection');
@@ -2027,9 +2099,12 @@ document.getElementById('btnSaveSwapInspection').addEventListener('click', async
   if(!currentSwapLeg) return;
   const kmRaw = document.getElementById('swInspKm').value;
   if(!kmRaw){ toast('Informe a quilometragem.', 'err'); return; }
+  const oilKmRaw = document.getElementById('swInspOilKm').value;
+  if(!oilKmRaw){ toast('Informe o KM da última troca de óleo (está no adesivo do vidro).', 'err'); return; }
   setBtnLoading('btnSaveSwapInspection', true, 'Enviando…', 'swInspUploadingBanner');
   try {
     const km = Number(kmRaw);
+    const oilChangeKm = Number(oilKmRaw);
     const observations = document.getElementById('swInspObservations').value.trim();
     const checklist = [];
     let hasProblem = false;
@@ -2043,7 +2118,7 @@ document.getElementById('btnSaveSwapInspection').addEventListener('click', async
 
     const { swapRequestId, leg, vehicleId, plate } = currentSwapLeg;
     const subfolder = driveVehicleFolder('VISTORIAS', plate, currentUser.name);
-    const photoSlotIds = {frente:'swInspPhotoFrente', traseira:'swInspPhotoTraseira', lateralEsq:'swInspPhotoLatEsq', lateralDir:'swInspPhotoLatDir', painel:'swInspPhotoPainel', interior:'swInspPhotoInterior', bancos:'swInspPhotoBancos', estepe:'swInspPhotoEstepe', portaMalas:'swInspPhotoPortaMalas', motor:'swInspPhotoMotor', painelCompleto:'swInspPhotoPainelCompleto', difusoresAr:'swInspPhotoDifusoresAr', pneus:'swInspPhotoPneus'};
+    const photoSlotIds = {frente:'swInspPhotoFrente', traseira:'swInspPhotoTraseira', lateralEsq:'swInspPhotoLatEsq', lateralDir:'swInspPhotoLatDir', painel:'swInspPhotoPainel', interior:'swInspPhotoInterior', bancos:'swInspPhotoBancos', estepe:'swInspPhotoEstepe', portaMalas:'swInspPhotoPortaMalas', motor:'swInspPhotoMotor', painelCompleto:'swInspPhotoPainelCompleto', difusoresAr:'swInspPhotoDifusoresAr', pneus:'swInspPhotoPneus', adesivoOleo:'swInspPhotoAdesivoOleo'};
     const missingPhotos = validatePhotoSlotsFilled(photoSlotIds);
     if(missingPhotos.length){ toast('Faltam fotos da vistoria: '+missingPhotos.join(', ')+'.', 'err'); return; }
     const photos = {};
@@ -2055,6 +2130,8 @@ document.getElementById('btnSaveSwapInspection').addEventListener('click', async
       `VISTORIA DE TROCA (${leg==='devolucao'?'veículo devolvido':'veículo recebido'}) — ${plate}\n\n` +
       `Motorista: ${currentUser.name}\n` +
       `KM: ${km}\n` +
+      `KM da última troca de óleo: ${oilChangeKm}\n` +
+      `Próxima revisão: ${oilChangeKm + OIL_CHANGE_INTERVAL_KM}\n` +
       `Resultado: ${RESULT_LABEL[result]}\n` +
       `Data: ${fmtDate(Date.now())}\n\n` +
       `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
@@ -2062,8 +2139,11 @@ document.getElementById('btnSaveSwapInspection').addEventListener('click', async
       `${new Date().toISOString().slice(0,10)}_vistoria_troca_${leg}.txt`, subfolder
     );
 
+    // O KM da troca de óleo fica guardado na vistoria. O veículo em si só é atualizado
+    // quando a troca é aprovada (aqui o carro recebido ainda não é do motorista, então
+    // ele não teria permissão pra escrever nele).
     const inspRef = await addDoc(collection(db,'inspections'), {
-      vehicleId, vehiclePlate: plate, driverId: currentUser.driverId, km, result, checklist, photos,
+      vehicleId, vehiclePlate: plate, driverId: currentUser.driverId, km, oilChangeKm, result, checklist, photos,
       extraPhotos:[], observations, driveTextFileId,
       swapRequestId, swapType: leg,
       createdBy: currentUser.name, createdAt: Date.now(), generatedTickets:[],
@@ -2093,8 +2173,9 @@ function openDriverInspectionModal(){
   if(!myVehicle) return;
   renderChecklistInto('pvInspChecklist', 'pv');
   document.getElementById('pvInspKm').value = '';
+  document.getElementById('pvInspOilKm').value = '';
   document.getElementById('pvInspObservations').value = '';
-  ['pvInspPhotoFrente','pvInspPhotoTraseira','pvInspPhotoLatEsq','pvInspPhotoLatDir','pvInspPhotoPainel','pvInspPhotoInterior','pvInspPhotoBancos','pvInspPhotoEstepe','pvInspPhotoPortaMalas','pvInspPhotoMotor','pvInspPhotoPainelCompleto','pvInspPhotoDifusoresAr','pvInspPhotoPneus'].forEach(id=>{
+  ['pvInspPhotoFrente','pvInspPhotoTraseira','pvInspPhotoLatEsq','pvInspPhotoLatDir','pvInspPhotoPainel','pvInspPhotoInterior','pvInspPhotoBancos','pvInspPhotoEstepe','pvInspPhotoPortaMalas','pvInspPhotoMotor','pvInspPhotoPainelCompleto','pvInspPhotoDifusoresAr','pvInspPhotoPneus','pvInspPhotoAdesivoOleo'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   openModal('modalDriverInspection');
@@ -2107,9 +2188,12 @@ document.getElementById('btnSaveDriverInspection').addEventListener('click', asy
   if(!myVehicle) return;
   const kmRaw = document.getElementById('pvInspKm').value;
   if(!kmRaw){ toast('Informe a quilometragem.', 'err'); return; }
+  const oilKmRaw = document.getElementById('pvInspOilKm').value;
+  if(!oilKmRaw){ toast('Informe o KM da última troca de óleo (está no adesivo do vidro).', 'err'); return; }
   setBtnLoading('btnSaveDriverInspection', true, 'Enviando…', 'pvInspUploadingBanner');
   try {
     const km = Number(kmRaw);
+    const oilChangeKm = Number(oilKmRaw);
     const observations = document.getElementById('pvInspObservations').value.trim();
     const checklist = [];
     let hasProblem = false;
@@ -2122,7 +2206,7 @@ document.getElementById('btnSaveDriverInspection').addEventListener('click', asy
     const result = hasProblem ? 'RESSALVAS' : 'APROVADO';
 
     const subfolder = driveVehicleFolder('VISTORIAS', myVehicle.plate, currentUser.name);
-    const photoSlotIds = {frente:'pvInspPhotoFrente', traseira:'pvInspPhotoTraseira', lateralEsq:'pvInspPhotoLatEsq', lateralDir:'pvInspPhotoLatDir', painel:'pvInspPhotoPainel', interior:'pvInspPhotoInterior', bancos:'pvInspPhotoBancos', estepe:'pvInspPhotoEstepe', portaMalas:'pvInspPhotoPortaMalas', motor:'pvInspPhotoMotor', painelCompleto:'pvInspPhotoPainelCompleto', difusoresAr:'pvInspPhotoDifusoresAr', pneus:'pvInspPhotoPneus'};
+    const photoSlotIds = {frente:'pvInspPhotoFrente', traseira:'pvInspPhotoTraseira', lateralEsq:'pvInspPhotoLatEsq', lateralDir:'pvInspPhotoLatDir', painel:'pvInspPhotoPainel', interior:'pvInspPhotoInterior', bancos:'pvInspPhotoBancos', estepe:'pvInspPhotoEstepe', portaMalas:'pvInspPhotoPortaMalas', motor:'pvInspPhotoMotor', painelCompleto:'pvInspPhotoPainelCompleto', difusoresAr:'pvInspPhotoDifusoresAr', pneus:'pvInspPhotoPneus', adesivoOleo:'pvInspPhotoAdesivoOleo'};
     const missingPhotos = validatePhotoSlotsFilled(photoSlotIds);
     if(missingPhotos.length){ toast('Faltam fotos da vistoria: '+missingPhotos.join(', ')+'.', 'err'); return; }
     const photos = {};
@@ -2134,6 +2218,8 @@ document.getElementById('btnSaveDriverInspection').addEventListener('click', asy
       `VISTORIA — ${myVehicle.plate}\n\n` +
       `Motorista: ${currentUser.name}\n` +
       `KM: ${km}\n` +
+      `KM da última troca de óleo: ${oilChangeKm}\n` +
+      `Próxima revisão: ${oilChangeKm + OIL_CHANGE_INTERVAL_KM}\n` +
       `Resultado: ${RESULT_LABEL[result]}\n` +
       `Data: ${fmtDate(Date.now())}\n\n` +
       `Checklist:\n${checklist.map(c=>`- ${c.label}: ${CHECKLIST_STATUS_LABEL[c.status]}${c.obs ? ' — '+c.obs : ''}`).join('\n')}\n\n` +
@@ -2144,14 +2230,17 @@ document.getElementById('btnSaveDriverInspection').addEventListener('click', asy
     const batch = writeBatch(db);
     batch.set(doc(collection(db,'inspections')), {
       vehicleId: myVehicle.id, vehiclePlate: myVehicle.plate, driverId: currentUser.driverId,
-      km, result, checklist, photos, extraPhotos:[], observations, driveTextFileId,
+      km, oilChangeKm, result, checklist, photos, extraPhotos:[], observations, driveTextFileId,
       swapRequestId: null,
       createdBy: currentUser.name, createdAt: Date.now(), generatedTickets:[],
     });
-    batch.update(doc(db,'vehicles',myVehicle.id), {pendingInspection: false, km});
+    batch.update(doc(db,'vehicles',myVehicle.id), {
+      pendingInspection: false, km, ...oilChangeVehicleFields(oilChangeKm),
+    });
     await batch.commit();
 
-    toast('Vistoria registrada.', 'ok');
+    const proxima = oilChangeKm + OIL_CHANGE_INTERVAL_KM;
+    toast(`Vistoria registrada. Próxima revisão em ${proxima.toLocaleString('pt-BR')} km.`, 'ok');
     closeModal('modalDriverInspection');
   } catch(err){
     toast('Erro ao salvar vistoria: '+err.message, 'err');
@@ -2330,13 +2419,19 @@ async function approveSwapRequest(s){
       driverId: null,
     });
     updateDriverAssignment(batch, s.fromVehicleId, s.fromPlate, fromVehicle?.driverId||null, null);
+    const toVehicle = vehicles.find(v=>v.id===s.toVehicleId);
     // Na troca por solicitação, o motorista JÁ fez a vistoria de recebimento do
     // carro novo (receiveInspectionId) durante o fluxo. Então o carro novo NÃO
     // fica com vistoria pendente — se cair aqui sem a vistoria de recebimento
     // (situação anômala), aí sim marca como pendente.
+    // Aproveita o KM da troca de óleo que o motorista anotou na vistoria de recebimento
+    // pra já deixar a próxima revisão do carro novo calculada.
+    const receiveInsp = inspections.find(i=>i.id===s.receiveInspectionId);
     batch.update(doc(db,'vehicles',s.toVehicleId), {
       status: 'em-uso', driverId: s.driverId,
       pendingInspection: s.receiveInspectionId ? false : true,
+      ...(receiveInsp?.km ? {km: Number(receiveInsp.km)} : {}),
+      ...oilChangeVehicleFields(receiveInsp?.oilChangeKm),
     });
     updateDriverAssignment(batch, s.toVehicleId, s.toPlate, toVehicle?.driverId||null, s.driverId);
     await batch.commit();
@@ -2466,24 +2561,6 @@ function renderDashboard(){
       <div class="lbl">${c.lbl}</div>
     </button>`).join('');
 
-  // Alerta pros staff: veículos sem vistoria em dia (vistoria pendente marcada,
-  // ou veículo já com motorista que nunca teve vistoria registrada).
-  const alertEl = document.getElementById('dashInspectionAlert');
-  if(alertEl){
-    const semVistoria = vehicles.filter(v=>vehicleNeedsInspection(v, inspections.filter(i=>i.vehicleId===v.id)));
-    if(semVistoria.length){
-      const plates = semVistoria
-        .map(v=>`${escapeHtml(v.plate||'—')}${v.driverId ? ' ('+escapeHtml(driverName(v.driverId))+')' : ''}`)
-        .join(', ');
-      alertEl.innerHTML = `<div class="alert-banner-danger" style="margin-bottom:24px;">
-        <span>⚠️ ${semVistoria.length} veículo(s) sem vistoria em dia: ${plates}.</span>
-        <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" onclick="switchView('vehicles', null)">Ver veículos</button>
-      </div>`;
-    } else {
-      alertEl.innerHTML = '';
-    }
-  }
-
   renderCharts();
 
   const recent = [...tickets].sort((a,b)=>b.createdAt-a.createdAt).slice(0,6);
@@ -2556,9 +2633,9 @@ function renderCharts(){
   }
 }
 
-// Exportação da frota inteira em planilha (CSV — abre direto no Excel). Uma linha por
-// veículo, ordenado por frota, com os dados pedidos: frota, veículo, cor, placa,
-// motorista e KM atual (já considerando o KM de vistorias, igual à tela de detalhe).
+// Exportação da frota em Excel (.xlsx): aba "Painel" na capa + uma aba por frota, com
+// veículo, cor, placa, motorista e KM atual (já considerando o KM de vistorias, igual à
+// tela de detalhe).
 // Carrega a biblioteca de Excel (xlsx-js-style) só quando o usuário exporta — não pesa
 // no carregamento normal do sistema. Fica em cache depois da primeira vez.
 function ensureXLSX(){
@@ -2686,6 +2763,299 @@ async function exportFleetToExcel(){
 }
 document.getElementById('btnExportFleetExcel').addEventListener('click', exportFleetToExcel);
 
+// ===== RELATÓRIO GERENCIAL COMPLETO (Excel) =====
+// Monta um workbook de gestão de frota cobrindo todas as áreas do gestor:
+// KPIs, veículos, condutores, manutenção, vistorias, documentação, custos,
+// combustível, pneus, sinistros e patrimônio. Preenche com os DADOS REAIS que
+// o sistema tem e deixa colunas prontas (em branco) pro que ainda não é medido.
+function buildManagementWorkbook(XLSX){
+  const NAVY='0D1626', WHITE='FFFFFF', INK='2A2D35', LIGHT='B8C4DA',
+        MUTED='6B7280', CARD='EAF2FF', ALT='F6F9FF', BORDER='9AA6B8',
+        GREEN='1E7B44', RED='B8202B', AMBER='B8720A';
+  const b = { style:'thin', color:{rgb:BORDER} };
+  const allB = { top:b, bottom:b, left:b, right:b };
+  const base = { font:{name:'Arial',sz:10,color:{rgb:INK}}, alignment:{vertical:'center'}, border:allB };
+  const S = {
+    title:  { font:{name:'Arial',sz:16,bold:true,color:{rgb:WHITE}}, fill:{patternType:'solid',fgColor:{rgb:NAVY}}, alignment:{horizontal:'left',vertical:'center'}, border:allB },
+    sub:    { font:{name:'Arial',sz:10,italic:true,color:{rgb:MUTED}}, alignment:{vertical:'center',wrapText:true} },
+    sec:    { font:{name:'Arial',sz:12,bold:true,color:{rgb:NAVY}}, alignment:{vertical:'center'} },
+    th:     { font:{name:'Arial',sz:10,bold:true,color:{rgb:WHITE}}, fill:{patternType:'solid',fgColor:{rgb:NAVY}}, alignment:{horizontal:'left',vertical:'center',wrapText:true}, border:allB },
+    td:     base,
+    tdAlt:  { ...base, fill:{patternType:'solid',fgColor:{rgb:ALT}} },
+    tdNum:  { ...base, alignment:{horizontal:'right',vertical:'center'} },
+    tdNumAlt:{ ...base, fill:{patternType:'solid',fgColor:{rgb:ALT}}, alignment:{horizontal:'right',vertical:'center'} },
+    lbl:    { font:{name:'Arial',sz:10,bold:true,color:{rgb:LIGHT}}, fill:{patternType:'solid',fgColor:{rgb:NAVY}}, alignment:{horizontal:'left',vertical:'center'}, border:allB },
+    val:    { font:{name:'Arial',sz:13,bold:true,color:{rgb:NAVY}}, alignment:{horizontal:'left',vertical:'center'}, border:allB },
+    ok:     { ...base, font:{name:'Arial',sz:10,bold:true,color:{rgb:GREEN}} },
+    bad:    { ...base, font:{name:'Arial',sz:10,bold:true,color:{rgb:RED}} },
+    warn:   { ...base, font:{name:'Arial',sz:10,bold:true,color:{rgb:AMBER}} },
+  };
+  const cell = (v, s) => ({ v: v==null?'':v, t: typeof v==='number'?'n':'s', s: s||S.td });
+  const fcell = (f, s) => ({ t:'n', f, s: s||S.tdNum });
+  const wb = XLSX.utils.book_new();
+  const usedNames = {};
+  const sheetName = (base) => {
+    let n = String(base).replace(/[\\/?*\[\]:]/g,'-').slice(0,28) || 'Aba';
+    let f = n, k = 2; while(usedNames[f]) f = (n.slice(0,26)+' '+(k++));
+    usedNames[f] = 1; return f;
+  };
+  // Monta uma aba padrão: título mesclado + cabeçalho + linhas (zebradas) + nota opcional.
+  const addSheet = (name, title, headers, rows, widths, note) => {
+    const span = headers.length;
+    const A = [];
+    A.push(headers.map((h,i)=> cell(i===0?title:'', S.title)));
+    A.push([]);
+    A.push(headers.map(h=>cell(h, S.th)));
+    rows.forEach((r,idx)=>{
+      const alt = idx%2===1;
+      A.push(r.map(c=>{
+        if(c && typeof c==='object' && ('f' in c || 'v' in c || 's' in c)) return c; // célula já pronta (fórmula/estilo)
+        const isNum = typeof c==='number';
+        return cell(c, isNum ? (alt?S.tdNumAlt:S.tdNum) : (alt?S.tdAlt:S.td));
+      }));
+    });
+    const merges = [{s:{r:0,c:0}, e:{r:0,c:span-1}}];
+    if(note){ A.push([]); A.push(headers.map((h,i)=>cell(i===0?note:'', S.sub))); merges.push({s:{r:A.length-1,c:0}, e:{r:A.length-1,c:span-1}}); }
+    const ws = XLSX.utils.aoa_to_sheet(A);
+    ws['!cols'] = widths.map(w=>({wch:w}));
+    ws['!merges'] = merges;
+    ws['!rows'] = [{hpt:24}];
+    XLSX.utils.book_append_sheet(wb, ws, sheetName(name));
+    return ws;
+  };
+
+  const currentYear = new Date().getFullYear();
+  const kmOf = v => Number(vehicleDisplayKm(v, inspections.filter(i=>i.vehicleId===v.id))) || 0;
+  const vlist = [...vehicles].sort((a,b)=>(a.plate||'').localeCompare(b.plate||''));
+  const veic = v => ((v.brand?v.brand+' ':'')+(v.model||'')).trim() || '—';
+  const cnhVencida = d => !!(d && d.cnhValidity && new Date(d.cnhValidity) < new Date());
+
+  // ---- KPIs (dados reais) ----
+  const total = vehicles.length;
+  const emManut = vehicles.filter(v=>v.status==='em-manutencao').length;
+  const sinistrados = vehicles.filter(v=>v.status==='sinistrado').length;
+  const emUso = vehicles.filter(v=>v.status==='em-uso').length;
+  const disponiveis = vehicles.filter(v=>v.status==='disponivel').length;
+  const reserva = vehicles.filter(v=>v.status==='reserva').length;
+  const disponibilidade = total ? Math.round((total-emManut-sinistrados)/total*100) : 0;
+  const osAbertas = tickets.filter(t=>t.status!=='CONCLUIDO').length;
+  const osConcluidas = tickets.filter(t=>t.status==='CONCLUIDO').length;
+  const anos = vehicles.map(v=>v.year).filter(y=>y);
+  const idadeMedia = anos.length ? (anos.reduce((s,y)=>s+(currentYear-y),0)/anos.length) : null;
+  const kmTotal = vehicles.reduce((s,v)=>s+kmOf(v),0);
+  const closed = tickets.filter(t=>t.status==='CONCLUIDO' && t.closedAt && t.createdAt);
+  const tempoMedioManut = closed.length ? (closed.reduce((s,t)=>s+(t.closedAt-t.createdAt),0)/closed.length/86400000) : null;
+  const semVistoria = vehicles.filter(v=>vehicleNeedsInspection(v, inspections.filter(i=>i.vehicleId===v.id))).length;
+  const cnhVencidas = drivers.filter(cnhVencida).length;
+  const crlvVencidos = vehicles.filter(v=>v.crlvYear && v.crlvYear < currentYear).length;
+
+  // ============ 1) PAINEL / KPIs ============
+  {
+    const P = [];
+    P.push([ cell('RELATÓRIO GERENCIAL DE FROTA — LUMAR TELECOM', S.title), cell('',S.title), cell('',S.title), cell('',S.title) ]);
+    P.push([ cell('Gerado em '+fmtDate(Date.now())+' · dados reais do sistema', S.sub) ]);
+    P.push([]);
+    P.push([ cell('INDICADORES DA FROTA (dados do sistema)', S.sec) ]);
+    const kpis = [
+      ['Total de veículos', total],
+      ['Disponibilidade da frota', disponibilidade+'%'],
+      ['Em uso', emUso],
+      ['Disponíveis', disponiveis],
+      ['Em manutenção', emManut],
+      ['Reserva', reserva],
+      ['Sinistrados', sinistrados],
+      ['O.S. abertas', osAbertas],
+      ['O.S. concluídas', osConcluidas],
+      ['Tempo médio de manutenção', tempoMedioManut!=null ? tempoMedioManut.toFixed(1)+' dias' : '—'],
+      ['Idade média da frota', idadeMedia!=null ? idadeMedia.toFixed(1)+' anos' : '—'],
+      ['Quilometragem total da frota', kmTotal ? kmTotal.toLocaleString('pt-BR')+' km' : '—'],
+      ['Veículos sem vistoria em dia', semVistoria],
+      ['CRLV vencidos', crlvVencidos],
+      ['CNHs vencidas', cnhVencidas],
+    ];
+    kpis.forEach(([l,v])=> P.push([ cell(l, S.lbl), cell(v, S.val) ]));
+    P.push([]);
+    P.push([ cell('INDICADORES QUE DEPENDEM DE DADOS EXTERNOS', S.sec) ]);
+    P.push([ cell('Preencha as abas correspondentes para calcular estes indicadores:', S.sub) ]);
+    [
+      ['Custo por km', 'aba Custos'],
+      ['Consumo médio (km/L)', 'aba Combustível'],
+      ['Multas por condutor', 'aba Custos / Sinistros'],
+      ['Índice de acidentes', 'aba Sinistros'],
+      ['Vida útil / rodízio de pneus', 'aba Pneus'],
+    ].forEach(([l,v])=> P.push([ cell(l, S.lbl), cell(v, S.val) ]));
+
+    const ws = XLSX.utils.aoa_to_sheet(P);
+    ws['!cols'] = [{wch:34},{wch:24},{wch:14},{wch:14}];
+    ws['!merges'] = [
+      {s:{r:0,c:0}, e:{r:0,c:3}}, {s:{r:1,c:0}, e:{r:1,c:3}},
+      {s:{r:3,c:0}, e:{r:3,c:3}},
+    ];
+    // mescla as linhas de seção de baixo dinamicamente
+    ws['!rows'] = [{hpt:26},{hpt:16}];
+    XLSX.utils.book_append_sheet(wb, ws, sheetName('Painel'));
+  }
+
+  // ============ 2) FROTA (VEÍCULOS) ============
+  addSheet('Veículos', 'FROTA — VEÍCULOS',
+    ['Placa','Nº frota','Marca/Modelo','Cor','Ano','Frota','Motorista','Status','KM atual','Últ. troca óleo (km)','Próx. revisão (km)','KM p/ revisão','Situação revisão','CRLV (ano)','Situação CRLV','Vistoria'],
+    vlist.map(v=>{
+      const km = kmOf(v);
+      const prox = v.nextMaintenanceKm || null;
+      const faltaKm = (prox && km) ? (prox - km) : null;
+      const revSit = faltaKm==null ? '—'
+        : (faltaKm <= 0 ? {v:'Atrasada', t:'s', s:S.bad}
+        : (faltaKm <= 1000 ? {v:'Próxima', t:'s', s:S.warn} : {v:'Em dia', t:'s', s:S.ok}));
+      const crlvSit = !v.crlvYear ? '—' : (v.crlvYear < currentYear ? {v:'Vencido', t:'s', s:S.bad} : {v:'Em dia', t:'s', s:S.ok});
+      const pend = vehicleNeedsInspection(v, inspections.filter(i=>i.vehicleId===v.id));
+      return [
+        v.plate||'—', v.fleetNumber||'—', veic(v), v.color||'—', v.year||'—',
+        FLEET_LABEL[v.fleet]||v.fleet||'—', driverName(v.driverId), VEHICLE_STATUS_LABEL[v.status]||v.status||'—',
+        km||'—', v.lastOilChangeKm||'—', prox||'—', faltaKm!=null?faltaKm:'—', revSit,
+        v.crlvYear||'—', crlvSit,
+        pend ? {v:'Pendente', t:'s', s:S.bad} : {v:'Em dia', t:'s', s:S.ok},
+      ];
+    }),
+    [11,9,22,12,7,14,20,15,11,17,14,13,15,10,13,12]
+  );
+
+  // ============ 3) CONDUTORES ============
+  addSheet('Condutores', 'CONDUTORES',
+    ['Nome','CNH','Categoria','Validade CNH','Situação CNH','Telefone','Status','Veículo atual'],
+    [...drivers].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(d=>{
+      const veh = vehicles.find(v=>v.driverId===d.id);
+      const venc = cnhVencida(d);
+      return [
+        d.name||'—', d.cnh||'—', d.cnhCategory||'—',
+        d.cnhValidity ? new Date(d.cnhValidity+'T00:00:00').toLocaleDateString('pt-BR') : '—',
+        venc ? {v:'Vencida', t:'s', s:S.bad} : (d.cnhValidity ? {v:'Em dia', t:'s', s:S.ok} : '—'),
+        d.phone||'—', d.status==='ativo'?'Ativo':(d.status||'—'),
+        veh ? (veh.plate + ' · ' + veic(veh)) : '—',
+      ];
+    }),
+    [24,14,10,14,13,16,10,26]
+  );
+
+  // ============ 4) MANUTENÇÃO (O.S.) ============
+  addSheet('Manutenção', 'MANUTENÇÃO — ORDENS DE SERVIÇO',
+    ['Nº O.S.','Placa','Prioridade','Status','Veículo parado','Abertura','Conclusão','Dias','Descrição'],
+    [...tickets].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(t=>{
+      const dias = (t.closedAt && t.createdAt) ? Math.max(0, Math.round((t.closedAt-t.createdAt)/86400000)) : '—';
+      return [
+        t.ticketNumber||'—', t.vehiclePlate||'—', PRIORITY_LABEL[t.priority]||t.priority||'—',
+        STATUS_LABEL[t.status]||t.status||'—', t.parado?'Sim':'Não',
+        t.createdAt?fmtDate(t.createdAt):'—', t.closedAt?fmtDate(t.closedAt):'—', dias,
+        t.description||'—',
+      ];
+    }),
+    [18,11,12,16,13,12,12,7,50]
+  );
+
+  // ============ 5) VISTORIAS ============
+  addSheet('Vistorias', 'VISTORIAS REALIZADAS',
+    ['Data','Placa','Motorista','KM','Resultado','Itens com problema'],
+    [...inspections].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).map(i=>{
+      const probs = (i.checklist||[]).filter(c=>c.status==='problema').map(c=>c.label).join('; ');
+      return [
+        i.createdAt?fmtDate(i.createdAt):'—', i.vehiclePlate||'—', driverName(i.driverId),
+        Number(i.km)||'—', RESULT_LABEL[i.result]||i.result||'—', probs||'—',
+      ];
+    }),
+    [12,11,22,10,14,44]
+  );
+
+  // ============ 6) DOCUMENTAÇÃO ============
+  addSheet('Documentação', 'CONTROLE DE DOCUMENTAÇÃO',
+    ['Placa','Veículo','CRLV (ano)','Situação CRLV','Venc. Seguro','Venc. IPVA','Insp. obrigatória','Observações'],
+    vlist.map(v=>{
+      const crlvSit = !v.crlvYear ? '—' : (v.crlvYear < currentYear ? {v:'Vencido', t:'s', s:S.bad} : {v:'Em dia', t:'s', s:S.ok});
+      return [ v.plate||'—', veic(v), v.crlvYear||'—', crlvSit, '', '', '', '' ];
+    }),
+    [11,22,11,13,14,14,16,30],
+    'Seguro, IPVA e inspeção obrigatória ainda não são controlados no sistema — preencha as datas de vencimento aqui.'
+  );
+
+  // ============ 7) CUSTOS (template por veículo, com fórmulas) ============
+  {
+    const headers = ['Placa','Combustível','Manutenção','Pneus','Lavagem','Pedágios','Multas','Total','KM rodado','Custo/km'];
+    const rows = vlist.map((v,idx)=>{
+      const excelRow = 4 + idx; // linha 1 título, 2 vazia, 3 cabeçalho, 4 primeira
+      const alt = idx%2===1;
+      const numS = alt?S.tdNumAlt:S.tdNum, txtS = alt?S.tdAlt:S.td;
+      return [
+        cell(v.plate||'—', txtS),
+        cell('', numS), cell('', numS), cell('', numS), cell('', numS), cell('', numS), cell('', numS),
+        fcell(`SUM(B${excelRow}:G${excelRow})`, numS),
+        cell(kmOf(v)||'', numS),
+        fcell(`IFERROR(H${excelRow}/I${excelRow},"")`, numS),
+      ];
+    });
+    addSheet('Custos', 'GESTÃO DE CUSTOS (R$)', headers, rows,
+      [11,13,13,10,10,10,10,12,11,11],
+      'Preencha os gastos por veículo. Total e Custo/km são calculados automaticamente. Combustível não é medido pelo sistema.');
+  }
+
+  // ============ 8) COMBUSTÍVEL (template) ============
+  {
+    const headers = ['Data','Placa','Motorista','Litros','KM anterior','KM atual','KM rodado','Consumo (km/L)','Obs.'];
+    const blanks = 24;
+    const rows = [];
+    for(let i=0;i<blanks;i++){
+      const excelRow = 4 + i;
+      const alt = i%2===1;
+      const numS = alt?S.tdNumAlt:S.tdNum, txtS = alt?S.tdAlt:S.td;
+      rows.push([
+        cell('', txtS), cell('', txtS), cell('', txtS), cell('', numS), cell('', numS), cell('', numS),
+        fcell(`IFERROR(F${excelRow}-E${excelRow},"")`, numS),
+        fcell(`IFERROR((F${excelRow}-E${excelRow})/D${excelRow},"")`, numS),
+        cell('', txtS),
+      ]);
+    }
+    addSheet('Combustível', 'GESTÃO DE COMBUSTÍVEL', headers, rows,
+      [12,11,20,9,12,12,11,14,26],
+      'Registre cada abastecimento. KM rodado e Consumo (km/L) são calculados automaticamente para comparar veículos e motoristas.');
+  }
+
+  // ============ 9) PNEUS (template) ============
+  addSheet('Pneus', 'GESTÃO DE PNEUS',
+    ['Placa','Posição','Marca/Modelo','Data instalação','KM instalação','KM atual','Vida útil (km)','Situação','Rodízio/Recap.'],
+    (()=>{ const r=[]; for(let i=0;i<24;i++) r.push(['','','','','','','','','']); return r; })(),
+    [11,14,20,14,13,11,13,14,16],
+    'Controle vida útil, rodízios e recapagens. Uma linha por pneu/posição.');
+
+  // ============ 10) SINISTROS (template) ============
+  addSheet('Sinistros', 'GESTÃO DE SINISTROS',
+    ['Data','Placa','Motorista','Descrição','Seguradora','Nº sinistro','Franquia (R$)','Custo reparo (R$)','Status'],
+    (()=>{ const r=[]; for(let i=0;i<15;i++) r.push(['','','','','','','','','']); return r; })(),
+    [12,11,20,34,16,14,13,15,16],
+    'Registre acidentes, acionamento da seguradora, franquias e custos de reparo.');
+
+  // ============ 11) PATRIMÔNIO / KIT SEGURANÇA (por veículo) ============
+  addSheet('Patrimônio', 'CONTROLE PATRIMONIAL / KIT DE SEGURANÇA',
+    ['Placa','Veículo','Escada','Rack/Suporte','Ferramentas','Cones','Giroflex','Extintor','Triângulo','EPI','Rastreador GPS','Estado geral'],
+    vlist.map(v=>[ v.plate||'—', veic(v), '','','','','','','','','','' ]),
+    [11,22,9,13,12,8,9,9,10,8,14,14],
+    'Marque OK / NÃO / N/A para cada acessório. Específico telecom: escadas, suportes, cones, giroflex, extintor, triângulo, EPI e rastreador.');
+
+  return wb;
+}
+
+async function exportManagementReport(){
+  const btn = document.getElementById('btnExportMgmtExcel');
+  const original = btn ? btn.textContent : '';
+  try {
+    if(btn){ btn.disabled = true; btn.textContent = 'Gerando…'; }
+    await ensureXLSX();
+    const wb = buildManagementWorkbook(XLSX);
+    XLSX.writeFile(wb, `relatorio_gerencial_frota_${new Date().toISOString().slice(0,10)}.xlsx`);
+  } catch(err){
+    toast(err.message || 'Erro ao gerar o relatório gerencial.', 'err');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = original; }
+  }
+}
+document.getElementById('btnExportMgmtExcel').addEventListener('click', exportManagementReport);
+
 /* ============ VEHICLES ============ */
 function populateVehicleSelect(){
   const options = vehicles.map(v=>`<option value="${v.id}">${escapeHtml(v.plate)} — ${escapeHtml(v.model||'')}</option>`).join('');
@@ -2747,12 +3117,22 @@ function renderFleetOverview(){
         <span>${FLEET_LABEL[key]}</span>
         <span class="fleet-count">${items.length}</span>
       </div>
-      ${items.length ? items.map(v=>`
+      ${items.length ? items.map(v=>{
+        // Ícone da vistoria: ✅ em dia, ⚠️ pendente. Carro sem motorista não tem
+        // vistoria a cobrar, então não ganha ícone nenhum.
+        const insp = inspections.filter(i=>i.vehicleId===v.id);
+        const icone = !v.driverId ? ''
+          : (vehicleNeedsInspection(v, insp)
+              ? `<span title="Vistoria pendente — ${escapeHtml(driverName(v.driverId))}" style="cursor:help;">⚠️</span>`
+              : `<span title="Vistoria em dia — ${escapeHtml(driverName(v.driverId))}" style="cursor:help;">✅</span>`);
+        return `
         <div class="fleet-veh-row" onclick="openVehicleDetail('${v.id}')">
           <span class="plate">${escapeHtml(v.plate)}</span>
           <span class="fleet-veh-model">${escapeHtml((v.brand?v.brand+' ':'')+(v.model||''))}</span>
+          ${icone}
           <span class="badge badge-${(v.status||'disponivel')}">${VEHICLE_STATUS_LABEL[v.status]||v.status}</span>
-        </div>`).join('') : '<div class="empty-state" style="padding:20px 8px;"><div class="ic">🚐</div>Nenhum veículo nesta frota.</div>'}
+        </div>`;
+      }).join('') : '<div class="empty-state" style="padding:20px 8px;"><div class="ic">🚐</div>Nenhum veículo nesta frota.</div>'}
     </div>`;
   }).join('');
 }
@@ -2819,7 +3199,16 @@ function openVehicleDetail(id){
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">KM atual</div>${(()=>{const k=vehicleDisplayKm(v, vehicleInspections); return k ? Number(k).toLocaleString('pt-BR') : '—';})()}</div>
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Motorista</div>${v.driverId ? `<span class="row-click" style="cursor:pointer; text-decoration:underline;" onclick="closeModal('modalVehicleDetail'); openDriverDetail('${v.driverId}')">${escapeHtml(driverName(v.driverId))}</span>` : '—'}</div>
     <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Ano do CRLV</div>${v.crlvYear || '—'}</div>
-    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Próxima revisão</div>${v.nextMaintenanceKm ? Number(v.nextMaintenanceKm).toLocaleString('pt-BR')+' km' : '—'}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Última troca de óleo</div>${v.lastOilChangeKm ? Number(v.lastOilChangeKm).toLocaleString('pt-BR')+' km' : '—'}</div>
+    <div><div style="color:var(--ink-muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">Próxima revisão</div>${(()=>{
+      if(!v.nextMaintenanceKm) return '—';
+      const alvo = Number(v.nextMaintenanceKm);
+      const atual = vehicleDisplayKm(v, vehicleInspections) || 0;
+      const falta = alvo - atual;
+      const cor = falta <= 0 ? 'var(--st-critica)' : (falta <= 1000 ? 'var(--st-alta)' : 'var(--ink)');
+      const nota = falta <= 0 ? `vencida há ${Math.abs(falta).toLocaleString('pt-BR')} km` : `faltam ${falta.toLocaleString('pt-BR')} km`;
+      return `<span style="color:${cor}; font-weight:600;">${alvo.toLocaleString('pt-BR')} km</span><div style="font-size:11px; color:${cor};">${nota}</div>`;
+    })()}</div>
   `;
   const vehicleHistory = driverAssignments.filter(a=>a.vehicleId===id).sort((a,b)=>b.startedAt-a.startedAt);
   document.getElementById('vdDriverHistoryWrap').innerHTML = vehicleHistory.length ? `
@@ -2935,13 +3324,51 @@ document.getElementById('btnSaveVehicle').addEventListener('click', async ()=>{
   }
 });
 
+// Commit em lotes: o Firestore aceita no máximo 500 operações por batch.
+async function commitInChunks(ops, chunkSize=400){
+  for(let i=0; i<ops.length; i+=chunkSize){
+    const batch = writeBatch(db);
+    ops.slice(i, i+chunkSize).forEach(fn=>fn(batch));
+    await batch.commit();
+  }
+}
+
+// Excluir o veículo leva junto tudo que era só dele: O.S., vistorias, histórico de
+// motoristas e os arquivos no Drive (fotos + .txt). Sem isso ficavam registros órfãos
+// apontando pra uma placa que não existe mais, e as fotos entulhando o Drive.
+// As trocas (vehicleSwaps/swapRequests) NÃO são apagadas de propósito: elas envolvem
+// dois veículos e ainda fazem parte do histórico do outro carro.
 async function deleteVehicle(id){
   const v = vehicles.find(x=>x.id===id);
   if(!v) return;
-  if(!confirm(`Excluir o veículo ${v.plate}? Esta ação não pode ser desfeita.`)) return;
+  const vTickets = tickets.filter(t=>t.vehicleId===id);
+  const vInspections = inspections.filter(i=>i.vehicleId===id);
+  const vAssignments = driverAssignments.filter(a=>a.vehicleId===id);
+
+  const partes = [];
+  if(vTickets.length) partes.push(`${vTickets.length} ordem(ns) de serviço`);
+  if(vInspections.length) partes.push(`${vInspections.length} vistoria(s)`);
+  if(vAssignments.length) partes.push(`${vAssignments.length} registro(s) de histórico de motorista`);
+  const detalhe = partes.length
+    ? `\n\nJunto com ele serão excluídos:\n• ${partes.join('\n• ')}\n\nAs fotos e os arquivos .txt desses registros também saem do Drive.`
+    : '\n\nEste veículo não tem O.S. nem vistorias registradas.';
+  if(!confirm(`Excluir o veículo ${v.plate}?${detalhe}\n\nEsta ação NÃO pode ser desfeita.`)) return;
+
   try {
-    await deleteDoc(doc(db,'vehicles',id));
-    toast('Veículo excluído.', 'ok');
+    // Junta todos os arquivos do Drive ligados ao veículo e ao que será apagado com ele.
+    const driveFiles = [v.photoURL];
+    vTickets.forEach(t=>driveFiles.push(t.photoURL, t.driveTextFileId, t.closingTextFileId, ...(t.closingPhotos||[])));
+    vInspections.forEach(i=>driveFiles.push(i.driveTextFileId, ...Object.values(i.photos||{}), ...(i.extraPhotos||[])));
+
+    const ops = [
+      ...vTickets.map(t=>b=>b.delete(doc(db,'tickets',t.id))),
+      ...vInspections.map(i=>b=>b.delete(doc(db,'inspections',i.id))),
+      ...vAssignments.map(a=>b=>b.delete(doc(db,'driverAssignments',a.id))),
+      b=>b.delete(doc(db,'vehicles',id)),
+    ];
+    await commitInChunks(ops);
+    deleteDriveFiles(driveFiles);
+    toast(`Veículo ${v.plate} excluído` + (partes.length ? ` (e ${partes.join(', ')}).` : '.'), 'ok');
   } catch(err){
     toast('Erro ao excluir veículo: '+err.message, 'err');
   }
@@ -3234,13 +3661,14 @@ document.getElementById('btnNewInspection').addEventListener('click', ()=>{
   document.getElementById('inspDriverId').value = '';
   document.getElementById('inspDate').value = toDatetimeLocal(new Date());
   document.getElementById('inspKm').value = '';
+  document.getElementById('inspOilKm').value = '';
   CHECKLIST_ITEMS.forEach(item=>{
     document.getElementById('chk_'+item.key).value = 'ok';
     const obs = document.getElementById('chkobs_'+item.key);
     obs.value = '';
     obs.classList.add('hidden');
   });
-  ['inspPhotoFrente','inspPhotoTraseira','inspPhotoLatEsq','inspPhotoLatDir','inspPhotoPainel','inspPhotoInterior','inspPhotoBancos','inspPhotoEstepe','inspPhotoPortaMalas','inspPhotoMotor','inspPhotoPainelCompleto','inspPhotoDifusoresAr','inspPhotoPneus','inspExtraPhotos'].forEach(id=>{
+  ['inspPhotoFrente','inspPhotoTraseira','inspPhotoLatEsq','inspPhotoLatDir','inspPhotoPainel','inspPhotoInterior','inspPhotoBancos','inspPhotoEstepe','inspPhotoPortaMalas','inspPhotoMotor','inspPhotoPainelCompleto','inspPhotoDifusoresAr','inspPhotoPneus','inspPhotoAdesivoOleo','inspExtraPhotos'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   document.getElementById('inspRetido').checked = false;
@@ -3256,10 +3684,13 @@ document.getElementById('btnSaveInspection').addEventListener('click', async ()=
   const driverId = document.getElementById('inspDriverId').value;
   const kmRaw = document.getElementById('inspKm').value;
   if(!vehicleId || !driverId || !kmRaw){ toast('Selecione o veículo, o condutor e informe a quilometragem.', 'err'); return; }
+  const oilKmRaw = document.getElementById('inspOilKm').value;
+  if(!oilKmRaw){ toast('Informe o KM da última troca de óleo (está no adesivo do vidro).', 'err'); return; }
   setBtnLoading('btnSaveInspection', true, 'Enviando…');
   try {
     const vehicle = vehicles.find(v=>v.id===vehicleId);
     const km = Number(kmRaw);
+    const oilChangeKm = Number(oilKmRaw);
     const dateVal = document.getElementById('inspDate').value;
     const performedAt = dateVal ? new Date(dateVal).getTime() : Date.now();
     const retido = document.getElementById('inspRetido').checked;
@@ -3281,7 +3712,7 @@ document.getElementById('btnSaveInspection').addEventListener('click', async ()=
     const inspDriverLabel = driverName(driverId);
     const inspSubfolder = driveVehicleFolder('VISTORIAS', vehicle?.plate, inspDriverLabel);
 
-    const photoSlotIds = {frente:'inspPhotoFrente', traseira:'inspPhotoTraseira', lateralEsq:'inspPhotoLatEsq', lateralDir:'inspPhotoLatDir', painel:'inspPhotoPainel', interior:'inspPhotoInterior', bancos:'inspPhotoBancos', estepe:'inspPhotoEstepe', portaMalas:'inspPhotoPortaMalas', motor:'inspPhotoMotor', painelCompleto:'inspPhotoPainelCompleto', difusoresAr:'inspPhotoDifusoresAr', pneus:'inspPhotoPneus'};
+    const photoSlotIds = {frente:'inspPhotoFrente', traseira:'inspPhotoTraseira', lateralEsq:'inspPhotoLatEsq', lateralDir:'inspPhotoLatDir', painel:'inspPhotoPainel', interior:'inspPhotoInterior', bancos:'inspPhotoBancos', estepe:'inspPhotoEstepe', portaMalas:'inspPhotoPortaMalas', motor:'inspPhotoMotor', painelCompleto:'inspPhotoPainelCompleto', difusoresAr:'inspPhotoDifusoresAr', pneus:'inspPhotoPneus', adesivoOleo:'inspPhotoAdesivoOleo'};
     const missingPhotos = validatePhotoSlotsFilled(photoSlotIds);
     if(missingPhotos.length){ toast('Faltam fotos da vistoria: '+missingPhotos.join(', ')+'.', 'err'); return; }
     const photos = {};
@@ -3297,6 +3728,8 @@ document.getElementById('btnSaveInspection').addEventListener('click', async ()=
       `Veículo: ${vehicle?.plate||'—'} — ${(vehicle?.brand?vehicle.brand+' ':'')+(vehicle?.model||'')}\n` +
       `Motorista/condutor: ${inspDriverLabel}\n` +
       `KM na vistoria: ${km}\n` +
+      `KM da última troca de óleo: ${oilChangeKm}\n` +
+      `Próxima revisão: ${oilChangeKm + OIL_CHANGE_INTERVAL_KM}\n` +
       `Resultado: ${RESULT_LABEL[result]}\n` +
       `Realizada por: ${currentUser.name}\n` +
       `Data: ${fmtDate(performedAt)}\n\n` +
@@ -3325,13 +3758,15 @@ document.getElementById('btnSaveInspection').addEventListener('click', async ()=
 
     batch.set(inspectionRef, {
       vehicleId, vehiclePlate: vehicle?.plate || '—',
-      driverId, km, retido, result, observations,
+      driverId, km, oilChangeKm, retido, result, observations,
       checklist, photos, extraPhotos, driveTextFileId: inspTextFileId,
       createdBy: currentUser.name, createdAt: performedAt,
       generatedTickets
     });
 
-    const vehicleUpdate = {pendingInspection: false};
+    // Além de baixar a vistoria pendente, atualiza o KM e já calcula a próxima revisão
+    // a partir da troca de óleo informada.
+    const vehicleUpdate = {pendingInspection: false, km, ...oilChangeVehicleFields(oilChangeKm)};
     if(result==='REPROVADO' && vehicle && vehicle.status!=='em-manutencao'){
       vehicleUpdate.status = 'em-manutencao';
     }
@@ -3907,12 +4342,25 @@ function compressImageFile(file, maxDim=1280, quality=0.7){
 // Web App do Apps Script que salva a foto na pasta do Google Drive (ver apps-script-drive-upload.gs)
 const DRIVE_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbzzVidDesLkDZpWSj2p2uO6ptAElAbpyXVPrVEgU0KkplntwCKZ99W5afrmAeKHnnFB/exec';
 
+// Token de identidade do usuário logado. O Apps Script valida esse token no Google antes
+// de aceitar upload/exclusão — assim o endpoint deixa de ser aberto pra internet inteira.
+// Se por algum motivo não houver usuário logado, devolve null e o script recusa.
+async function getIdToken(){
+  try {
+    return auth.currentUser ? await auth.currentUser.getIdToken() : null;
+  } catch(err){
+    console.error('Não consegui obter o token de autenticação:', err);
+    return null;
+  }
+}
+
 async function uploadPhotoToDrive(dataUrl, filename, subfolder){
   try {
+    const idToken = await getIdToken();
     const res = await fetch(DRIVE_UPLOAD_URL, {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'}, // evita preflight CORS no Apps Script
-      body: JSON.stringify({ base64: dataUrl, filename, mimeType: 'image/jpeg', subfolder }),
+      body: JSON.stringify({ idToken, base64: dataUrl, filename, mimeType: 'image/jpeg', subfolder }),
     });
     const json = await res.json();
     if(json && json.ok) return json.directUrl || json.url;
@@ -3957,10 +4405,11 @@ function textToBase64(text){
 
 async function uploadTextToDrive(text, filename, subfolder){
   try {
+    const idToken = await getIdToken();
     const res = await fetch(DRIVE_UPLOAD_URL, {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      body: JSON.stringify({ base64: textToBase64(text), filename, mimeType: 'text/plain', subfolder }),
+      body: JSON.stringify({ idToken, base64: textToBase64(text), filename, mimeType: 'text/plain', subfolder }),
     });
     const json = await res.json();
     if(!(json && json.ok)){ console.error('Falha ao subir txt pro Drive:', json && json.error); return null; }
@@ -3987,10 +4436,11 @@ async function deleteDriveFiles(fileIdsOrUrls){
   const ids = (fileIdsOrUrls||[]).map(v => extractDriveFileId(v) || v).filter(looksLikeId);
   if(!ids.length) return;
   try {
+    const idToken = await getIdToken();
     await fetch(DRIVE_UPLOAD_URL, {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=utf-8'},
-      body: JSON.stringify({ action:'delete', fileIds: ids }),
+      body: JSON.stringify({ idToken, action:'delete', fileIds: ids }),
     });
   } catch(err){
     console.error('Erro ao excluir arquivos do Drive:', err);
@@ -3999,6 +4449,11 @@ async function deleteDriveFiles(fileIdsOrUrls){
 
 function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
 function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
+// Script é type="module", então nada fica global automaticamente. Como alguns links
+// montados via template usam onclick="closeModal(...)", precisam estar no window —
+// senão o clique quebra com "closeModal is not defined" e o resto do onclick não roda.
+window.openModal = openModal;
+window.closeModal = closeModal;
 
 // Trava o botão de salvar (evita duplo clique enquanto sobe foto pro Drive) e,
 // se houver um banner de upload correspondente no modal, mostra/esconde ele também.
