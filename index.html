@@ -1206,6 +1206,39 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 </div>
 
 <!-- ============ MODAL: VISTORIA PENDENTE (motorista faz por conta própria) ============ -->
+<!-- ============ MODAL: MEUS DADOS (motorista completa o próprio cadastro) ============ -->
+<div class="modal-backdrop hidden" id="modalMyDriver">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-head"><h3>Completar meu cadastro</h3><button class="modal-close" data-close="modalMyDriver">×</button></div>
+    <div class="modal-body">
+      <div id="mdMissingBanner"></div>
+      <div class="form-grid">
+        <div class="field full">
+          <label>Nome</label>
+          <div id="mdName" style="padding:10px 0; font-weight:600;">—</div>
+        </div>
+        <div class="field"><label>CNH (número) *</label><input id="mdCnh" required></div>
+        <div class="field">
+          <label>Categoria *</label>
+          <select id="mdCnhCategory">
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="AB">AB</option>
+          </select>
+        </div>
+        <div class="field"><label>Validade da CNH *</label><input id="mdCnhValidity" type="date" required></div>
+        <div class="field"><label>Telefone *</label><input id="mdPhone" placeholder="(00) 00000-0000" required></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" data-close="modalMyDriver">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnSaveMyDriver">Salvar meus dados</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop hidden" id="modalDriverInspection">
   <div class="modal-box wide">
     <div class="modal-head"><h3>Fazer vistoria do veículo</h3><button class="modal-close" data-close="modalDriverInspection">×</button></div>
@@ -1338,6 +1371,7 @@ let inspections = [];
 let vehicleSwaps = [];
 let driverAssignments = [];
 let myVehicle = null;
+let myDriver = null;
 let myTickets = [];
 let myInspections = [];
 let mySwapRequests = [];
@@ -1777,6 +1811,14 @@ function attachMotoristaListeners(){
     renderMeuCarro(); renderMinhasOS();
     return;
   }
+  // Cadastro do próprio motorista — usado pra avisar quando faltam dados (CNH,
+  // validade, telefone) e deixar ele mesmo completar.
+  const unsubMe = onSnapshot(doc(db,'drivers',currentUser.driverId), dsnap=>{
+    myDriver = dsnap.exists() ? {id:dsnap.id, ...dsnap.data()} : null;
+    renderMeuCarro();
+  }, err=>toast('Erro lendo seu cadastro: '+err.message, 'err'));
+  unsubscribers.push(unsubMe);
+
   const sq = query(collection(db,'swapRequests'), where('driverId','==', currentUser.driverId));
   const unsubS = onSnapshot(sq, ssnap=>{
     mySwapRequests = ssnap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -1900,16 +1942,29 @@ function renderMeuCarro(){
   if(!wrap) return;
   const v = myVehicle;
   const firstName = escapeHtml((currentUser?.name||'').trim().split(/\s+/)[0] || '');
+
+  // Aviso do próprio cadastro do motorista (CNH, validade, telefone), no mesmo
+  // formato do aviso de vistoria — e com botão pra ele mesmo completar.
+  const meusDadosFaltando = myDriver ? driverMissingFields(myDriver) : [];
+  const bannerCadastro = meusDadosFaltando.length ? `<div class="alert-banner-danger">
+      <span>⚠️ Seu cadastro está incompleto. Falta: ${escapeHtml(meusDadosFaltando.join(', '))}.</span>
+      <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" id="btnCompletarMeuCadastro">Completar cadastro</button>
+    </div>` : '';
+
   if(!v){
     wrap.innerHTML = `
       <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
+      ${bannerCadastro}
       <div class="panel"><div class="empty-state"><div class="ic">🚐</div>Nenhum veículo vinculado ao seu usuário ainda. Fale com o administrador.</div></div>`;
+    const btnCad = document.getElementById('btnCompletarMeuCadastro');
+    if(btnCad) btnCad.addEventListener('click', openMyDriverModal);
     return;
   }
   const photo = vehicleDisplayPhoto(v, myInspections);
   const activeSwap = getActiveSwapRequest();
   wrap.innerHTML = `
     <h2 style="font-size:21px; font-weight:700; margin-bottom:18px;">${greetingWord()}, ${firstName}</h2>
+    ${bannerCadastro}
     ${vehicleNeedsInspection(v, myInspections) ? `<div class="alert-banner-danger">
       <span>⚠️ Seu veículo precisa passar por uma vistoria.</span>
       <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" id="btnFazerVistoriaPendente">Fazer vistoria</button>
@@ -1939,7 +1994,49 @@ function renderMeuCarro(){
   });
   const btnVistoria = document.getElementById('btnFazerVistoriaPendente');
   if(btnVistoria) btnVistoria.addEventListener('click', openDriverInspectionModal);
+  const btnCadastro = document.getElementById('btnCompletarMeuCadastro');
+  if(btnCadastro) btnCadastro.addEventListener('click', openMyDriverModal);
 }
+
+// O motorista completa os próprios dados. Só pode mexer em CNH, categoria, validade
+// e telefone — nome e status continuam sendo coisa do administrador.
+function openMyDriverModal(){
+  if(!myDriver){ toast('Seu cadastro de motorista ainda não foi criado. Fale com o administrador.', 'err'); return; }
+  document.getElementById('mdName').textContent = myDriver.name || '—';
+  document.getElementById('mdCnh').value = myDriver.cnh || '';
+  document.getElementById('mdCnhCategory').value = myDriver.cnhCategory || 'B';
+  document.getElementById('mdCnhValidity').value = myDriver.cnhValidity || '';
+  document.getElementById('mdPhone').value = myDriver.phone || '';
+  const faltando = driverMissingFields(myDriver);
+  document.getElementById('mdMissingBanner').innerHTML = faltando.length
+    ? `<div class="alert-banner-danger" style="margin-bottom:14px;"><span>⚠️ Falta preencher: ${escapeHtml(faltando.join(', '))}.</span></div>`
+    : '';
+  openModal('modalMyDriver');
+}
+window.openMyDriverModal = openMyDriverModal;
+
+document.getElementById('btnSaveMyDriver').addEventListener('click', async ()=>{
+  if(!myDriver) return;
+  const payload = {
+    cnh: document.getElementById('mdCnh').value.trim(),
+    cnhCategory: document.getElementById('mdCnhCategory').value,
+    cnhValidity: document.getElementById('mdCnhValidity').value,
+    phone: document.getElementById('mdPhone').value.trim(),
+  };
+  // Valida usando o cadastro completo (o nome vem do que já está salvo).
+  const faltando = driverMissingFields({...myDriver, ...payload});
+  if(faltando.length){ toast('Preencha: ' + faltando.join(', ') + '.', 'err'); return; }
+  setBtnLoading('btnSaveMyDriver', true, 'Salvando…');
+  try {
+    await updateDoc(doc(db,'drivers',myDriver.id), payload);
+    toast('Cadastro atualizado. Obrigado!', 'ok');
+    closeModal('modalMyDriver');
+  } catch(err){
+    toast('Erro ao salvar seus dados: '+err.message, 'err');
+  } finally {
+    setBtnLoading('btnSaveMyDriver', false);
+  }
+});
 
 function renderMinhasOS(){
   const tbody = document.getElementById('minhasOSTbody');
