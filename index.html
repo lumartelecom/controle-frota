@@ -76,14 +76,18 @@ a{color:inherit;}
 #loginError{color:var(--st-critica); font-size:13px; margin-top:10px; display:none;}
 
 /* ============ APP SHELL ============ */
-#appShell{display:flex; min-height:100vh;}
+/* O app ocupa exatamente a altura da tela e NÃO deixa a página rolar por fora.
+   Quem rola é só o #content — assim aparece uma única barra de rolagem, e a
+   sidebar e o topbar ficam sempre visíveis (não somem ao descer a lista).
+   O 100dvh cobre o celular, onde a barra do navegador muda a altura útil. */
+#appShell{display:flex; height:100vh; height:100dvh; overflow:hidden;}
 #sidebar{
   width:230px; background:var(--surface); border-right:1px solid var(--border);
   display:flex; flex-direction:column; transition:width .18s ease; flex-shrink:0;
 }
 #sidebar.collapsed{width:68px;}
 /* motorista: sidebar sempre se comporta como drawer (some por completo, some por cima do conteúdo) */
-#sidebar.sidebar-drawer{position:fixed; z-index:90; height:100vh; left:0; top:0; width:230px; box-shadow:var(--shadow-md);}
+#sidebar.sidebar-drawer{position:fixed; z-index:90; height:100vh; height:100dvh; left:0; top:0; width:230px; box-shadow:var(--shadow-md);}
 #sidebar.sidebar-drawer.collapsed{width:0; overflow:hidden; border:none; box-shadow:none;}
 .sb-head{display:flex; align-items:center; gap:10px; padding:18px 16px; border-bottom:1px solid var(--border);}
 .sb-head .mark{width:32px; height:32px; border-radius:8px; background:var(--brand); flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:13px;}
@@ -102,7 +106,9 @@ a{color:inherit;}
 .sb-item.active{background:var(--brand); color:var(--brand-ink);}
 .sb-item .ic{width:18px; text-align:center; flex-shrink:0;}
 .sb-foot{padding:12px; border-top:1px solid var(--border);}
-.main-wrap{flex:1; display:flex; flex-direction:column; min-width:0;}
+/* min-height:0 é o que permite o #content encolher e rolar por dentro do flex,
+   em vez de esticar o shell e jogar a rolagem pra página. */
+.main-wrap{flex:1; display:flex; flex-direction:column; min-width:0; min-height:0;}
 #topbar{
   height:60px; background:var(--surface); border-bottom:1px solid var(--border);
   display:flex; align-items:center; justify-content:space-between; padding:0 20px; flex-shrink:0;
@@ -118,7 +124,8 @@ a{color:inherit;}
 .user-chip .av{width:26px; height:26px; border-radius:50%; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;}
 .user-chip .info{line-height:1.2;}
 .user-chip .role{font-size:10px; color:var(--ink-muted); text-transform:uppercase;}
-#content{flex:1; overflow-y:auto; padding:24px;}
+/* Única área que rola no sistema inteiro. */
+#content{flex:1; min-height:0; overflow-y:auto; padding:24px;}
 
 /* ============ CARDS / KPI ============ */
 .kpi-grid{display:flex; flex-wrap:nowrap; gap:14px; margin-bottom:28px; overflow-x:auto; padding-bottom:2px;}
@@ -176,8 +183,10 @@ tbody tr:nth-child(even) td{background:color-mix(in srgb, var(--surface-alt) 55%
 tr.row-click{transition:background-color .12s ease;}
 tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 .plate{font-family:'IBM Plex Mono',monospace; font-weight:600; background:var(--surface-alt); padding:3px 8px; border-radius:5px; border:1px solid var(--border); letter-spacing:.03em;}
-.table-scroll{overflow-x:auto; overflow-y:auto; max-height:560px;}
-.table-scroll th{position:sticky; top:0; z-index:1;}
+/* Só rolagem horizontal (tabela larga no celular). A vertical foi tirada de
+   propósito: com altura máxima ela criava uma SEGUNDA barra de rolagem em cima
+   da barra da página. Como a tabela é paginada em 10 linhas, ela cabe inteira. */
+.table-scroll{overflow-x:auto;}
 .th-sortable{cursor:pointer; user-select:none; white-space:nowrap;}
 .th-sortable:hover{color:var(--ink);}
 .th-sortable .arrow{opacity:.7; font-size:9px; margin-left:3px;}
@@ -317,7 +326,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 .vehicle-photo-frame .photo-placeholder span{font-size:12.5px;}
 
 @media(max-width:860px){
-  #sidebar{position:fixed; z-index:90; height:100vh; left:0; top:0; box-shadow:var(--shadow-md);}
+  #sidebar{position:fixed; z-index:90; height:100vh; height:100dvh; left:0; top:0; box-shadow:var(--shadow-md);}
   #sidebar:not(.collapsed){width:230px;}
   #sidebar.collapsed{width:0; overflow:hidden; border:none; box-shadow:none;}
   /* o topbar precisa ficar ACIMA da sidebar fixa, senão o botão ☰ fica escondido atrás dela */
@@ -584,6 +593,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <button class="btn btn-primary btn-sm" id="btnNewDriver">+ Novo motorista</button>
           </div>
         </div>
+        <div id="driversIncompleteAlert"></div>
         <div class="panel">
           <div class="table-scroll">
             <table>
@@ -874,6 +884,7 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
     <div class="modal-head"><h3 id="driverModalTitle">Novo motorista</h3><button class="modal-close" data-close="modalDriver">×</button></div>
     <div class="modal-body">
       <input type="hidden" id="drvId">
+      <div id="drvMissingBanner"></div>
       <div class="form-grid">
         <div class="field full"><label>Nome *</label><input id="drvName" required></div>
         <div class="field"><label>CNH (número) *</label><input id="drvCnh" required></div>
@@ -887,8 +898,8 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <option value="AB">AB</option>
           </select>
         </div>
-        <div class="field"><label>Validade da CNH</label><input id="drvCnhValidity" type="date"></div>
-        <div class="field"><label>Telefone</label><input id="drvPhone" placeholder="(00) 00000-0000"></div>
+        <div class="field"><label>Validade da CNH *</label><input id="drvCnhValidity" type="date" required></div>
+        <div class="field"><label>Telefone *</label><input id="drvPhone" placeholder="(00) 00000-0000" required></div>
         <div class="field">
           <label>Status</label>
           <select id="drvStatus">
@@ -1445,6 +1456,24 @@ function updateDriverAssignment(batch, vehicleId, vehiclePlate, oldDriverId, new
 }
 function isCnhExpired(d){
   return !!(d.cnhValidity && new Date(d.cnhValidity) < new Date());
+}
+
+// Campos obrigatórios do motorista. Sem CNH e validade não dá pra controlar
+// vencimento; sem telefone não dá pra avisar o condutor. Devolve a lista do que
+// está faltando (vazia = cadastro completo).
+const DRIVER_REQUIRED_FIELDS = [
+  {key:'name', label:'Nome'},
+  {key:'cnh', label:'CNH (número)'},
+  {key:'cnhCategory', label:'Categoria da CNH'},
+  {key:'cnhValidity', label:'Validade da CNH'},
+  {key:'phone', label:'Telefone'},
+];
+function driverMissingFields(d){
+  if(!d) return DRIVER_REQUIRED_FIELDS.map(f=>f.label);
+  return DRIVER_REQUIRED_FIELDS.filter(f=>!String(d[f.key]||'').trim()).map(f=>f.label);
+}
+function driverIsIncomplete(d){
+  return driverMissingFields(d).length > 0;
 }
 
 // Alertas preventivos do veículo: documentos vencendo/vencidos e revisão por KM.
@@ -3422,6 +3451,18 @@ function renderDrivers(){
   });
   document.getElementById('driverCountDesc').textContent = `${drivers.length} motorista(s) cadastrado(s)`;
   document.getElementById('driversEmpty').classList.toggle('hidden', filtered.length>0);
+
+  // Aviso de cadastro incompleto, no mesmo padrão do aviso de vistoria pendente.
+  const alertEl = document.getElementById('driversIncompleteAlert');
+  if(alertEl){
+    const incompletos = drivers.filter(driverIsIncomplete);
+    alertEl.innerHTML = incompletos.length ? `<div class="alert-banner-danger">
+      <span>⚠️ ${incompletos.length} motorista(s) com cadastro incompleto: ${
+        incompletos.slice(0,4).map(d=>escapeHtml(d.name||'sem nome')).join(', ')
+      }${incompletos.length>4 ? ` e mais ${incompletos.length-4}` : ''}. Falta CNH, validade ou telefone.</span>
+      <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" onclick="openDriverModal('${incompletos[0].id}')">Completar cadastro</button>
+    </div>` : '';
+  }
   document.getElementById('driversThead').innerHTML = `<tr>
     ${sortableTh('drivers','name','Nome')}${sortableTh('drivers','cnh','CNH')}${sortableTh('drivers','cnhCategory','Categoria')}
     ${sortableTh('drivers','cnhValidity','Validade CNH')}${sortableTh('drivers','phone','Telefone')}${sortableTh('drivers','vehicle','Veículo')}
@@ -3433,7 +3474,7 @@ function renderDrivers(){
     const expired = isCnhExpired(d);
     return `
     <tr class="row-click" onclick="openDriverDetail('${d.id}')">
-      <td>${escapeHtml(d.name)}</td>
+      <td>${escapeHtml(d.name)}${driverIsIncomplete(d) ? ' <span class="badge badge-alerta">📝 Cadastro incompleto</span>' : ''}</td>
       <td class="mono">${escapeHtml(d.cnh||'—')}</td>
       <td>${escapeHtml(d.cnhCategory||'—')}</td>
       <td>${d.cnhValidity ? new Date(d.cnhValidity+'T00:00:00').toLocaleDateString('pt-BR') : '—'}${expired ? ' <span class="badge badge-sinistrado">Vencida</span>' : ''}</td>
@@ -3459,22 +3500,32 @@ function openDriverModal(id){
   document.getElementById('drvCnhValidity').value = d?.cnhValidity || '';
   document.getElementById('drvPhone').value = d?.phone || '';
   document.getElementById('drvStatus').value = d?.status || 'ativo';
+  // Ao abrir um cadastro já existente que está incompleto, mostra o que falta.
+  const faltando = d ? driverMissingFields(d) : [];
+  document.getElementById('drvMissingBanner').innerHTML = faltando.length
+    ? `<div class="alert-banner-danger" style="margin-bottom:14px;"><span>⚠️ Falta preencher: ${escapeHtml(faltando.join(', '))}.</span></div>`
+    : '';
   openModal('modalDriver');
 }
 window.openDriverModal = openDriverModal;
 
 document.getElementById('btnSaveDriver').addEventListener('click', async ()=>{
   const id = document.getElementById('drvId').value;
-  const name = document.getElementById('drvName').value.trim();
-  if(!name){ toast('Nome é obrigatório.', 'err'); return; }
   const payload = {
-    name,
+    name: document.getElementById('drvName').value.trim(),
     cnh: document.getElementById('drvCnh').value.trim(),
     cnhCategory: document.getElementById('drvCnhCategory').value,
     cnhValidity: document.getElementById('drvCnhValidity').value,
     phone: document.getElementById('drvPhone').value.trim(),
     status: document.getElementById('drvStatus').value,
   };
+  // Todos os dados do motorista são obrigatórios — sem eles não dá pra controlar
+  // vencimento de CNH nem avisar o condutor por telefone.
+  const faltando = driverMissingFields(payload);
+  if(faltando.length){
+    toast('Preencha: ' + faltando.join(', ') + '.', 'err');
+    return;
+  }
   try {
     if(id){
       await updateDoc(doc(db,'drivers',id), payload);
