@@ -593,7 +593,6 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
             <button class="btn btn-primary btn-sm" id="btnNewDriver">+ Novo motorista</button>
           </div>
         </div>
-        <div id="driversIncompleteAlert"></div>
         <div class="panel">
           <div class="table-scroll">
             <table>
@@ -884,7 +883,6 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
     <div class="modal-head"><h3 id="driverModalTitle">Novo motorista</h3><button class="modal-close" data-close="modalDriver">×</button></div>
     <div class="modal-body">
       <input type="hidden" id="drvId">
-      <div id="drvMissingBanner"></div>
       <div class="form-grid">
         <div class="field full"><label>Nome *</label><input id="drvName" required></div>
         <div class="field"><label>CNH (número) *</label><input id="drvCnh" required></div>
@@ -1505,9 +1503,6 @@ const DRIVER_REQUIRED_FIELDS = [
 function driverMissingFields(d){
   if(!d) return DRIVER_REQUIRED_FIELDS.map(f=>f.label);
   return DRIVER_REQUIRED_FIELDS.filter(f=>!String(d[f.key]||'').trim()).map(f=>f.label);
-}
-function driverIsIncomplete(d){
-  return driverMissingFields(d).length > 0;
 }
 
 // Alertas preventivos do veículo: documentos vencendo/vencidos e revisão por KM.
@@ -3548,18 +3543,9 @@ function renderDrivers(){
   });
   document.getElementById('driverCountDesc').textContent = `${drivers.length} motorista(s) cadastrado(s)`;
   document.getElementById('driversEmpty').classList.toggle('hidden', filtered.length>0);
-
-  // Aviso de cadastro incompleto, no mesmo padrão do aviso de vistoria pendente.
-  const alertEl = document.getElementById('driversIncompleteAlert');
-  if(alertEl){
-    const incompletos = drivers.filter(driverIsIncomplete);
-    alertEl.innerHTML = incompletos.length ? `<div class="alert-banner-danger">
-      <span>⚠️ ${incompletos.length} motorista(s) com cadastro incompleto: ${
-        incompletos.slice(0,4).map(d=>escapeHtml(d.name||'sem nome')).join(', ')
-      }${incompletos.length>4 ? ` e mais ${incompletos.length-4}` : ''}. Falta CNH, validade ou telefone.</span>
-      <button type="button" class="btn btn-sm" style="background:#B8202B; color:#fff;" onclick="openDriverModal('${incompletos[0].id}')">Completar cadastro</button>
-    </div>` : '';
-  }
+  // Sem banner nem selo de "cadastro incompleto" aqui: as colunas em branco na
+  // tabela já mostram isso pro staff. Quem precisa do aviso é o motorista, na
+  // tela dele — é ele quem preenche os próprios dados.
   document.getElementById('driversThead').innerHTML = `<tr>
     ${sortableTh('drivers','name','Nome')}${sortableTh('drivers','cnh','CNH')}${sortableTh('drivers','cnhCategory','Categoria')}
     ${sortableTh('drivers','cnhValidity','Validade CNH')}${sortableTh('drivers','phone','Telefone')}${sortableTh('drivers','vehicle','Veículo')}
@@ -3571,7 +3557,7 @@ function renderDrivers(){
     const expired = isCnhExpired(d);
     return `
     <tr class="row-click" onclick="openDriverDetail('${d.id}')">
-      <td>${escapeHtml(d.name)}${driverIsIncomplete(d) ? ' <span class="badge badge-alerta">📝 Cadastro incompleto</span>' : ''}</td>
+      <td>${escapeHtml(d.name)}</td>
       <td class="mono">${escapeHtml(d.cnh||'—')}</td>
       <td>${escapeHtml(d.cnhCategory||'—')}</td>
       <td>${d.cnhValidity ? new Date(d.cnhValidity+'T00:00:00').toLocaleDateString('pt-BR') : '—'}${expired ? ' <span class="badge badge-sinistrado">Vencida</span>' : ''}</td>
@@ -3597,11 +3583,6 @@ function openDriverModal(id){
   document.getElementById('drvCnhValidity').value = d?.cnhValidity || '';
   document.getElementById('drvPhone').value = d?.phone || '';
   document.getElementById('drvStatus').value = d?.status || 'ativo';
-  // Ao abrir um cadastro já existente que está incompleto, mostra o que falta.
-  const faltando = d ? driverMissingFields(d) : [];
-  document.getElementById('drvMissingBanner').innerHTML = faltando.length
-    ? `<div class="alert-banner-danger" style="margin-bottom:14px;"><span>⚠️ Falta preencher: ${escapeHtml(faltando.join(', '))}.</span></div>`
-    : '';
   openModal('modalDriver');
 }
 window.openDriverModal = openDriverModal;
