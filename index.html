@@ -236,6 +236,23 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
 .report-box-body{font-size:13.5px; line-height:1.5; white-space:pre-wrap;}
 .svc-textarea{width:100%; min-height:90px; padding:0; border:none; background:transparent; color:var(--ink); font-size:13.5px; line-height:1.5; resize:vertical; outline:none; font-family:inherit;}
 @media(max-width:560px){.report-grid{grid-template-columns:1fr;}}
+/* ============ ITENS DA O.S. (serviços / peças adicionados) ============ */
+.os-items{border:1px solid var(--border); border-radius:10px; padding:14px; background:var(--surface-alt); margin-bottom:18px;}
+.os-items-list{display:flex; flex-direction:column; gap:8px; margin-bottom:12px;}
+.os-item{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:9px 10px; border:1px solid var(--border); border-radius:8px; font-size:13.5px;}
+.os-item-type{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:3px 8px; border-radius:999px; border:1px solid var(--border); color:var(--ink-muted); white-space:nowrap;}
+.os-item-type.peca{color:var(--brand); border-color:var(--brand);}
+.os-item-desc{flex:1; min-width:140px; font-weight:600;}
+.os-item-meta{font-size:12px; color:var(--ink-muted);}
+.os-item-total{font-size:13px; font-weight:700; white-space:nowrap;}
+.os-items-form{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+.os-items-form input, .os-items-form select{padding:8px 10px; border:1.5px solid var(--border); border-radius:7px; background:var(--surface); color:var(--ink); outline:none; font-size:13px;}
+.os-items-form input:focus, .os-items-form select:focus{border-color:var(--brand);}
+.os-items-form .oi-desc{flex:1; min-width:180px;}
+.os-items-form .oi-qty{width:80px;}
+.os-items-form .oi-val{width:120px;}
+.os-items-sum{text-align:right; font-size:13px; color:var(--ink-muted); margin-bottom:10px;}
+.os-items-sum strong{color:var(--ink);}
 
 .result-pill{display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; color:#fff;}
 .res-APROVADO{background:var(--st-concluido);}
@@ -987,6 +1004,8 @@ tr.row-click:hover td{background:var(--surface-alt); cursor:pointer;}
       <div id="tdPhotoWrap" style="margin-bottom:14px;"></div>
 
       <div class="report-grid" id="tdReportGrid" style="margin-bottom:18px;"></div>
+
+      <div class="os-items" id="tdItems"></div>
 
       <div id="tdStatusActions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;"></div>
     </div>
@@ -4172,6 +4191,8 @@ function openTicketDetail(id){
     </div>
   `;
 
+  renderTicketItems(t);
+
   const actionsEl = document.getElementById('tdStatusActions');
   const printBtn = `<button type="button" class="btn btn-ghost btn-sm" id="btnPrintTicket">🖨 Imprimir</button>`;
   if(t.status!=='CONCLUIDO'){
@@ -4205,6 +4226,102 @@ function openTicketDetail(id){
 }
 window.openTicketDetail = openTicketDetail;
 
+/* ---- itens adicionais da O.S. (serviços e peças) ---- */
+const ITEM_TYPE_LABEL = { SERVICO:'Serviço', PECA:'Peça' };
+function fmtMoney(n){ return Number(n||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}); }
+function ticketItemsTotal(items){ return (items||[]).reduce((s,i)=>s + (Number(i.qty)||0)*(Number(i.unitValue)||0), 0); }
+
+function renderTicketItems(t){
+  const wrap = document.getElementById('tdItems');
+  const items = t.items || [];
+  const isOpen = t.status !== 'CONCLUIDO';
+  const listHtml = items.length ? items.map(i=>{
+    const total = (Number(i.qty)||0)*(Number(i.unitValue)||0);
+    return `
+      <div class="os-item">
+        <span class="os-item-type ${i.type==='PECA'?'peca':''}">${ITEM_TYPE_LABEL[i.type]||'Item'}</span>
+        <span class="os-item-desc">${escapeHtml(i.description)}</span>
+        <span class="os-item-meta">Qtd ${Number(i.qty).toLocaleString('pt-BR')}${i.unitValue ? ' × '+fmtMoney(i.unitValue) : ''} · ${escapeHtml(i.addedByName||'—')} em ${fmtDate(i.addedAt)}</span>
+        ${i.unitValue ? `<span class="os-item-total">${fmtMoney(total)}</span>` : ''}
+        ${isOpen ? `<button type="button" class="btn btn-danger btn-xs" data-remove-item="${escapeHtml(i.id)}" title="Remover">✕</button>` : ''}
+      </div>`;
+  }).join('') : `<div style="font-size:13px; color:var(--ink-faint);">Nenhum serviço ou peça adicionado${isOpen ? ' ainda' : ''}.</div>`;
+  const grandTotal = ticketItemsTotal(items);
+
+  wrap.innerHTML = `
+    <div class="report-box-head">🧩 Serviços e peças adicionados</div>
+    <div class="os-items-list">${listHtml}</div>
+    ${grandTotal ? `<div class="os-items-sum">Total: <strong>${fmtMoney(grandTotal)}</strong></div>` : ''}
+    ${isOpen ? `
+      <div class="os-items-form">
+        <select id="oiType">
+          <option value="SERVICO">Serviço</option>
+          <option value="PECA">Peça</option>
+        </select>
+        <input id="oiDesc" class="oi-desc" type="text" placeholder="Descrição (ex.: filtro de óleo, alinhamento…)">
+        <input id="oiQty" class="oi-qty" type="number" min="0.01" step="any" value="1" title="Quantidade">
+        <input id="oiVal" class="oi-val" type="number" min="0" step="0.01" placeholder="Valor un. (R$)" title="Valor unitário (opcional)">
+        <button type="button" class="btn btn-primary btn-sm" id="btnAddTicketItem" style="width:auto;">+ Adicionar</button>
+      </div>` : ''}
+  `;
+  if(!isOpen) return;
+
+  const addBtn = document.getElementById('btnAddTicketItem');
+  const doAdd = async ()=>{
+    if(addBtn.disabled) return;
+    const description = document.getElementById('oiDesc').value.trim();
+    const qty = Number(document.getElementById('oiQty').value);
+    const valRaw = document.getElementById('oiVal').value;
+    const unitValue = valRaw==='' ? null : Number(valRaw);
+    if(!description){ toast('Descreva o serviço ou peça.', 'err'); return; }
+    if(!(qty>0)){ toast('Informe uma quantidade válida.', 'err'); return; }
+    if(unitValue!==null && !(unitValue>=0)){ toast('Valor unitário inválido.', 'err'); return; }
+    const item = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,7),
+      type: document.getElementById('oiType').value,
+      description, qty, unitValue,
+      addedByUid: currentUser.uid, addedByName: currentUser.name,
+      addedAt: Date.now(),
+    };
+    addBtn.disabled = true;
+    try {
+      await updateDoc(doc(db,'tickets',t.id), { items: arrayUnion(item), updatedAt: Date.now() });
+      toast(`${ITEM_TYPE_LABEL[item.type]} adicionado à O.S.`, 'ok');
+      openTicketDetail(t.id);
+      document.getElementById('oiDesc')?.focus();
+    } catch(err){
+      toast('Erro ao adicionar item: '+err.message, 'err');
+      addBtn.disabled = false;
+    }
+  };
+  addBtn.addEventListener('click', doAdd);
+  document.getElementById('oiDesc').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); doAdd(); } });
+
+  wrap.querySelectorAll('[data-remove-item]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const item = items.find(i=>i.id===btn.dataset.removeItem);
+      if(!item) return;
+      if(!confirm(`Remover "${item.description}" da O.S.?`)) return;
+      try {
+        await updateDoc(doc(db,'tickets',t.id), { items: arrayRemove(item), updatedAt: Date.now() });
+        toast('Item removido.', 'ok');
+        openTicketDetail(t.id);
+      } catch(err){
+        toast('Erro ao remover item: '+err.message, 'err');
+      }
+    });
+  });
+}
+
+function ticketItemsText(items){
+  if(!(items||[]).length) return '';
+  const lines = items.map(i=>`- [${ITEM_TYPE_LABEL[i.type]||'Item'}] ${i.description} — Qtd ${i.qty}` +
+    (i.unitValue ? ` × ${fmtMoney(i.unitValue)} = ${fmtMoney(i.qty*i.unitValue)}` : '') +
+    ` (por ${i.addedByName||'—'} em ${fmtDate(i.addedAt)})`);
+  const total = ticketItemsTotal(items);
+  return `\nServiços e peças adicionados:\n${lines.join('\n')}\n` + (total ? `Total: ${fmtMoney(total)}\n` : '');
+}
+
 function openTicketCloseModal(id){
   const t = tickets.find(x=>x.id===id);
   if(!t) return;
@@ -4237,7 +4354,8 @@ document.getElementById('btnConfirmCloseTicket').addEventListener('click', async
       `Motorista: ${closeDriverLabel}\n` +
       `Fechada por: ${currentUser.name}\n` +
       `Data de fechamento: ${fmtDate(Date.now())}\n\n` +
-      `Serviço executado:\n${closingDescription}\n`,
+      `Serviço executado:\n${closingDescription}\n` +
+      ticketItemsText(t.items),
       `${t.ticketNumber}_fechamento.txt`, closeSubfolder
     );
     const closeBatch = writeBatch(db);
@@ -4313,6 +4431,24 @@ function printTicket(t){
       <p>${escapeHtml(t.description)}</p>
       ${t.photoURL ? `<div class="print-photos"><img src="${driveViewableUrl(t.photoURL)}"></div>` : ''}
     </div>
+
+    ${(t.items||[]).length ? `
+    <div class="box">
+      <div class="box-head">🧩 Serviços e peças adicionados</div>
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead><tr style="text-align:left; border-bottom:1px solid #ccc;">
+          <th style="padding:4px;">Tipo</th><th style="padding:4px;">Descrição</th><th style="padding:4px; text-align:right;">Qtd</th><th style="padding:4px; text-align:right;">Valor un.</th><th style="padding:4px; text-align:right;">Total</th>
+        </tr></thead>
+        <tbody>${t.items.map(i=>`<tr style="border-bottom:1px solid #eee;">
+          <td style="padding:4px;">${ITEM_TYPE_LABEL[i.type]||'Item'}</td>
+          <td style="padding:4px;">${escapeHtml(i.description)}</td>
+          <td style="padding:4px; text-align:right;">${Number(i.qty).toLocaleString('pt-BR')}</td>
+          <td style="padding:4px; text-align:right;">${i.unitValue ? fmtMoney(i.unitValue) : '—'}</td>
+          <td style="padding:4px; text-align:right;">${i.unitValue ? fmtMoney(i.qty*i.unitValue) : '—'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+      ${ticketItemsTotal(t.items) ? `<p style="text-align:right; margin-top:6px;"><strong>Total: ${fmtMoney(ticketItemsTotal(t.items))}</strong></p>` : ''}
+    </div>` : ''}
 
     ${closingHtml}
 
